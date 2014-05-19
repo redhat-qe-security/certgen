@@ -106,7 +106,7 @@ x509CERT=${x509CERT:-cert.pem}
 x509CSR=${x509CSR:-request.csr}
 x509CACNF=${x509CACNF:-ca.cnf}
 x509CAINDEX=${x509CAINDEX:-index.txt}
-x509CASERIAL=${X509CASERIAL:-serial}
+x509CASERIAL=${x509CASERIAL:-serial}
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #   Internal Functions
@@ -390,7 +390,7 @@ Specifies the common name (CN) for distinguished name (DN) in the certificate.
 This applies for both the subject name and issuer name in the generated
 certificate.
 
-If no B<--DN>'s are specified, C<localhost> will be used for I<webclient> and
+If no B<--DN>'s are specified, C<localhost> will be used for I<webserver> and
 C<John Smith> for I<webclient>. I<ca> role will not get a common name but
 its DN will be set to C<O=Example CA>.
 
@@ -483,7 +483,8 @@ x509SelfSign() {
     #
 
     if [ ! -d "$kAlias" ] || [ ! -e "$kAlias/$x509PKEY" ]; then
-        echo "x509SelfSign: private key '$kAlias' has not yet been generated" >&2
+        echo "x509SelfSign: private key '$kAlias' has not yet been generated"\
+            >&2
         return 1
     fi
 
