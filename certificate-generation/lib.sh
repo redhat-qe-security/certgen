@@ -911,6 +911,83 @@ x509SelfSign() {
 
 }
 
+true <<'=cut'
+=pod
+
+=head2 x509KeyCopy()
+
+Create a new key by copying the key material from a different certificate/key.
+
+=over 4
+
+B<x509KeyCopy>
+B<-t> I<target>
+I<alias>
+
+=back
+
+Uses the key from I<alias> to create a directory I<target> with the same key.
+
+Returns non zero if I<target> exists or I<alias> doesn't exist or doesn't
+contain private key.
+
+=back
+
+=cut
+
+x509KeyCopy() {
+
+    # destination of copy
+    local newKey=""
+    # source of key
+    local kAlias=""
+
+    local TEMP=$(getopt -o t: -n x509KeyCopy -- "$@")
+    if [ $? -ne 0 ]; then
+        echo "X509KeyCopy: Can't parse options" >&2
+        return 1
+    fi
+
+    eval set -- "$TEMP"
+
+    while true ; do
+        case "$1" in
+            -t) newKey="$2"; shift 2
+                ;;
+            --) shift 1
+                break
+            *) echo "x509KeyCopy: Unknown option: $1" >&2
+                return 1
+        esac
+    done
+
+    kAlias="$1"
+
+    if [ ! -e "$kAlias/$x509PKEY" ]; then
+        echo "x509KeyCopy: Source invalid" >&2
+        return 1
+    fi
+
+    if [ -e "$newKey" ]; then
+        echo "x509KeyCopy: Destination exists" >&2
+        return 1
+    fi
+
+    mkdir "$newKey"
+    if [ $? -ne 0 ]; then
+        echo "x509KeyCopy: Can't create directory for new key" >&2
+        return 1
+    fi
+
+    cp "$kAlias/$x509PKEY" "$newKey"
+    if [ $? -ne 0 ]; then
+        echo "x509KeyCopy: Can't copy key" >&2
+        return 1
+    fi
+
+    return 0
+}
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #   Execution
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
