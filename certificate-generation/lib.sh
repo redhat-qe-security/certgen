@@ -824,8 +824,8 @@ x509SelfSign() {
         case $certRole in
             ca) basicKeyUsage="critical, keyCertSign, cRLSign"
                 ;;
-            webserver) basicKeyUsage="critical, digitalSignature, "\
-                "keyEncipherment, keyAgreement"
+            webserver) basicKeyUsage="critical, digitalSignature, "
+                basicKeyUsage+="keyEncipherment, keyAgreement"
                 ;;
             webclient) basicKeyUsage="digitalSignature, keyEncipherment"
                 ;;
@@ -866,7 +866,7 @@ x509SelfSign() {
     # it will be included only in V3 certs, so we can add it by default
     parameters+=("--subjectKeyIdentifier")
 
-    __INTERNAL_x509GenConfig "${parameters[@]}" $kAlias
+    __INTERNAL_x509GenConfig "${parameters[@]}" "$kAlias"
     if [ $? -ne 0 ]; then
         return 1
     fi
@@ -880,7 +880,7 @@ x509SelfSign() {
 
     # create dummy self signed certificate
     openssl req -x509 -new -key $kAlias/$x509PKEY -out $kAlias/temp-$x509CERT \
-        -batch -config $kAlias/$x509CACNF -subj "/OU=TEST/c=pl"
+        -batch -config $kAlias/$x509CACNF
     if [ $? -ne 0 ]; then
         echo "x509SelfSign: temporary certificate generation failed" >&2
         return 1
@@ -931,8 +931,6 @@ Uses the key from I<alias> to create a directory I<target> with the same key.
 Returns non zero if I<target> exists or I<alias> doesn't exist or doesn't
 contain private key.
 
-=back
-
 =cut
 
 x509KeyCopy() {
@@ -956,6 +954,7 @@ x509KeyCopy() {
                 ;;
             --) shift 1
                 break
+                ;;
             *) echo "x509KeyCopy: Unknown option: $1" >&2
                 return 1
         esac
