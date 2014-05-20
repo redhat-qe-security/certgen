@@ -987,6 +987,404 @@ x509KeyCopy() {
     return 0
 }
 
+true <<'=cut'
+=pod
+
+=head2 x509CertSign()
+
+Create a certificate signed by a given alias.
+
+=over 4
+
+B<x509CertSign>
+[B<--bcCritical>]
+[B<--bcPathLen> I<PATHLEN>]
+[B<--caFalse>]
+[B<--caTrue>]
+[B<--DN> I<DNPART>]
+[B<--md> I<HASHNAME>]
+[B<--noBasicConstraints>]
+[B<--notAfter> I<ENDDATE>]
+[B<--notBefore> I<STARTDATE>]
+[B<-t> I<TYPE>]
+[B<-v> I<version>]
+B<--CA> I<CAAlias>
+I<alias>
+
+=back
+
+=over
+
+=item B<--bcCritical>
+
+Sets the C<critical> flag for Basic Constraints extension.
+See B<X.509 EXTENSIONS> section to see what it means.
+
+=item B<--bcPathLen> I<PATHLEN>
+
+Sets the maximum path len for certificate chain to I<PATHLEN>.
+
+Undefined (unbounded) by default.
+
+=item B<--CA> I<CAAlias>
+
+Name the key and certificate used for signing the new certificate.
+
+The CA specified by I<CAAlias> must have its key generated and certificate
+present (either through self signing or through previous certificate
+signing operation).
+
+=item B<--caFalse>
+
+Sets the Basic Constraints flag for CA to false. Note that his unsets the
+default criticality flag for Basic Constraints. To restore it, use
+B<--bcCritical>.
+
+This is the default for C<webserver> and C<webclient> roles.
+
+=item B<--caTrue>
+
+Sets the Basic Constraints flag for CA to true. Note that this unsets
+the default flag for criticality of Basic Constraints. To restore it, use
+B<--bcCritical>.
+
+This is the default for C<CA> role.
+
+=item B<--DN> I<DNPART>
+
+Specifies parts of distinguished name (DN) of the generated certificate.
+The order in which they are provided will be used for certificate generation.
+
+See the same option description for I<x509SelfSign> for available I<DNPART>
+options.
+
+By default C<O = Example intermediate CA> for C<CA> role, C<CN = localhost>
+for C<webserver> role and C<CN = John Smith> for C<webclient> role.
+
+=item B<--md> I<HASHNAME>
+
+Sets the cryptographic hash (message digest) for signing certificates.
+
+Note that some combinations of key types and digest algorithms are unsupported.
+For example, you can't sign using ECDSA and MD5.
+
+SHA256 by default, will be updated to weakeast hash recommended by NIST or
+generally thought to be secure.
+
+=item B<--noBasicConstraints>
+
+Remove Basic Constraints extension from the certificate completely.
+Note that in PKIX certificate validation, V3 certificate with no Basic
+Constraints will I<not> be considered to be a CA.
+
+=item B<--notAfter> I<ENDDATE>
+
+Sets the date after which the certificate won't be valid.
+Uses date(1) for conversion so values like "1 year" (from now), "2 years ago",
+"3 months", "4 weeks ago", "2 days ago", etc. work just as well as values
+like "20100101123500Z".
+Use C<date -d I<ENDDATE>> to verify if it represent the date you want.
+
+By default C<10 years> for I<ca> role, C<1 year> for all others.
+
+=item B<--notBefore> I<STARTDATE>
+
+Sets the date since which the certificate is valid. Uses date(1) for conversion
+so values like "1 year" (from now), "2 years ago", "3 months", "4 weeks ago",
+"2 days ago", etc. work just as well as values like "20100101123500Z".
+Use C<date -d I<STARTDATE>> to verify if it represents the date you want.
+
+By default C<5 years ago> for I<ca> role, C<now> for all others.
+
+=item B<-t> I<TYPE>
+
+Sets the general type of certificate: C<CA>, C<webserver> or C<webclient>.
+In case there are no additional options, this also sets correct values
+for basic key usage and extended key usage for given role.
+
+Note that while the names indicate "web", they actually apply for all servers
+and clients that use TLS or SSL and in case of C<webclient> also for S/MIME.
+
+C<webserver> by default.
+
+=item B<-v> I<version>
+
+Version of the certificate to create, accepted versions are C<1> and C<3>.
+Unfortunately, creating version C<1> certificate with extensions is impossible
+with current openssl so the script detects that and returns error.
+
+Version C<3> by default.
+
+=item I<alias>
+
+Location of the private key for signing.
+
+Note that the private key must have been already generated.
+
+=back
+
+Return 0 if signing was successfull, non zero otherwise.
+
+=cut
+
+x509CertSign() {
+    # alias of the key to be signed
+    local kAlias
+    # alias of the CA key and cert to be used for signing
+    local caAlias
+    # X.509 certificate version (1 or 3)
+    local certV="3"
+    # role of certificate
+    local certRole="webserver"
+    # date since which the cert is valid
+    # default is in config generator (now)
+    local notBefore=""
+    # date until which the cert is valid
+    # default is in config generator (1 year)
+    local notAfter=""
+    # set the value for CA bit for Basic Constraints
+    local basicConstraints=""
+    # set the length for pathlen in Basic Constraints
+    local bcPathLen=""
+    # set the criticality flag for Basic Constraints
+    local bcCritical=""
+    # set the message digest used for signing the certificate
+    # default is in config generator (sha256)
+    local certMD=""
+    # sets the Basic Key Usage
+    local basicKeyUsage=""
+    # distinguished name of the signed certificate
+    local certDN=()
+
+    #
+    # parse options
+    #
+
+    local TEMP=$(getopt -o v:t: -l CA: \
+        -l notAfter: \
+        -l notBefore: \
+        -l caTrue \
+        -l caFalse \
+        -l noBasicConstraints \
+        -l bcPathLen: \
+        -l bcCritical \
+        -l md: \
+        -n x509CertSign -- "$@")
+    if [ $? -ne 0 ]; then
+        echo "x509CertSign: can't parse options" >&2
+        return 1
+    fi
+
+    eval set -- "$TEMP"
+
+    while true ; do
+        case "$1" in
+            -v) certV="$2"; shift 2
+                ;;
+            -t) certRole="$2"; shift 2
+                ;;
+            --CA) caAlias="$2"; shift 2
+                ;;
+            --notAfter) notAfter="$2"; shift 2
+                ;;
+            --notBefore) notBefore="$2"; shift 2
+                ;;
+            --caTrue) basicConstraints="CA:TRUE"; shift 1
+                ;;
+            --caFalse) basicConstraints="CA:FALSE"; shift 1
+                ;;
+            --noBasicConstraints) basicConstraints="undefined"; shift 1
+                ;;
+            --bcPathLen) bcPathLen="$2"; shift 2
+                ;;
+            --bcCritical) bcCritical="true"; shift 1
+                ;;
+            --md) certMD="$2"; shift 2
+                ;;
+            --) shift 1
+                break
+                ;;
+            *) echo "x509CertSign: Unknown option: $1" >&2
+                return 1
+        esac
+    done
+
+    kAlias="$1"
+
+    #
+    # sanity check options
+    #
+
+    if [ ! -e "$kAlias/$x509PKEY" ]; then
+        echo "x509CertSign: Private key to be signed does not exist" >&2
+        return 1
+    fi
+
+    if [ ! -e "$caAlias/$x509PKEY" ]; then
+        echo "x509CertSign: CA private key does not exist" >&2
+        return 1
+    fi
+
+    if [ ! -e "$caAlias/$x509CERT" ]; then
+        echo "x509CertSign: CA certificate does not exist" >&2
+        return 1
+    fi
+
+    if [[ $certV != "1" ]] && [[ $certV != "3" ]]; then
+        echo "x509CertSign: Only version 1 and 3 certificates are supported" \
+            >&2
+        return 1
+    fi
+
+    certRole=${certRole,,}
+    if [[ $certRole != "ca" ]] && [[ $certRole != "webserver" ]] \
+        && [[ $certRole != "webclient" ]]; then
+
+        echo "x509SelfSign: Unknown role: '$certRole'" >&2
+        return 1
+    fi
+
+    if [ ${#certDN[@]} -eq 0 ]; then
+        case $certRole in
+            ca) certDN+=("O = Example intermediate CA")
+                ;;
+            webserver) certDN+=("CN = localhost")
+                ;;
+            webclient) certDN+=("CN = John Smith")
+                ;;
+            *) echo "x509CertSign: Unknown cert role: $certRole" >&2
+                return 1
+                ;;
+        esac
+    fi
+
+    if [[ -z $notAfter ]] && [[ $certRole == "ca" ]]; then
+        notAfter="10 years"
+    fi # default of "1 year" for other roles is in config generator
+
+    if [[ -z $notBefore ]] && [[ $certRole == "ca" ]]; then
+        notBefore="5 years ago"
+    fi # default of "now" for other roles is in config generator
+
+    if [[ ! -z $bcPathLen ]]; then
+        if [[ $basicConstraints == "undefined" ]] ||
+            [[ $basicConstraints == "CA:FALSE" ]]; then
+            echo "x509SelfSign: Path len can be specified only with caTrue "\
+                "option" >&2
+            return 1
+        fi
+        if [[ $certRole != "ca" ]] && [[ -z $basicConstraints ]]; then
+            echo "x509SelfSign: Only ca role uses CA:TRUE constraint, use "\
+                "--caTrue to override" >&2
+            return 1;
+        fi
+    fi
+
+    if [[ -z $basicConstraints ]]; then
+        case $certRole in
+            ca) basicConstraints="CA:TRUE"
+                bcCritical="true"
+                ;;
+            *) basicConstraints="CA:FALSE"
+                bcCritical="true"
+                ;;
+        esac
+    fi
+
+    local basicConstraintsOption=""
+    if [[ $bcCritical == "true" ]]; then
+        basicConstraintsOption="critical, "
+    fi
+    if [[ $basicConstraints == "undefined" ]]; then
+        basicConstraintsOption=""
+    else
+        basicConstraintsOption+="${basicConstraints}"
+        if [[ ! -z $bcPathLen ]]; then
+            basicConstraintsOption+=", pathlen: ${bcPathLen}"
+        fi
+    fi
+
+    if [[ -z $basicKeyUsage ]]; then
+        case $certRole in
+            ca) basicKeyUsage="critical, keyCertSign, cRLSign"
+                ;;
+            webserver) basicKeyUsage="critical, digitalSignature, "
+                basicKeyUsage+="keyEncipherment, keyAgreement"
+                ;;
+            webclient) basicKeyUsage="digitalSignature, keyEncipherment"
+                ;;
+            *) echo "x509SelfSign: Unknown cert role: $certRole" >&2
+                return 1
+                ;;
+        esac
+    fi
+
+    #
+    # prepare configuration file for signing
+    #
+
+    local parameters=()
+    for option in "${certDN[@]}"; do
+        parameters+=("--dn=$option")
+    done
+
+    if [[ ! -z $notAfter ]]; then
+        parameters+=("--notAfter=$notAfter")
+    fi
+    if [[ ! -z $notBefore ]]; then
+        parameters+=("--notBefore=$notBefore")
+    fi
+
+    if [[ ! -z $basicConstraintsOption ]]; then
+        parameters+=("--basicConstraints=$basicConstraintsOption")
+    fi
+
+    if [[ ! -z $basicKeyUsage ]]; then
+        parameters+=("--basicKeyUsage=$basicKeyUsage")
+    fi
+
+    if [[ ! -z $certMD ]]; then
+        parameters+=("--md=$certMD")
+    fi
+
+    # TODO add ability to disable this
+    parameters+=("--subjectKeyIdentifier")
+    parameters+=("--authorityKeyIdentifier")
+
+    __INTERNAL_x509GenConfig "${parameters[@]}" "$caAlias"
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
+
+    #
+    # create the certificate
+    #
+
+    openssl req -new -batch -key "$kAlias/$x509PKEY" -out "$kAlias/$x509CSR" \
+        -config "$caAlias/$x509CACNF"
+    if [ $? -ne 0 ]; then
+        echo "x509CertSign: Certificate Signing Request generation failed" >&2
+        return 1
+    fi
+
+    local caOptions=()
+    caOptions+=("-preserveDN")
+    if [[ $certV == "3" ]]; then
+        caOptions+=("-extensions" "v3_ext")
+    fi
+
+    openssl ca -config "$caAlias/$x509CACNF" -batch \
+        -keyfile "$caAlias/$x509PKEY" \
+        -cert "$caAlias/$x509CERT" \
+        -in "$kAlias/$x509CSR" \
+        -out "$kAlias/$x509CERT" \
+        "${caOptions[@]}"
+    if [ $? -ne 0 ]; then
+        echo "x509CertSign: Signing of the certificate failed" >&2
+        return 1
+    fi
+}
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #   Execution
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
