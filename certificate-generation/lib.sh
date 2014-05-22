@@ -141,6 +141,8 @@ __INTERNAL_x509GenConfig() {
     local subjectKeyIdentifier=""
     # whatever to generate Authority Key Identifier extension
     local authorityKeyIdentifier=""
+    # variable that has the Subject Alternative Name split by lines
+    local subjectAltName=()
 
     #
     # parse options
@@ -151,6 +153,7 @@ __INTERNAL_x509GenConfig() {
         -l basicConstraints: \
         -l subjectKeyIdentifier \
         -l authorityKeyIdentifier \
+        -l subjectAltName: \
         -n x509GenConfig -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509GenConfig: can't parse options" >&2
@@ -176,6 +179,8 @@ __INTERNAL_x509GenConfig() {
             --subjectKeyIdentifier) subjectKeyIdentifier="true"; shift 1
                 ;;
             --authorityKeyIdentifier) authorityKeyIdentifier="true"; shift 1
+                ;;
+            --subjectAltName) subjectAltName+=("$2"); shift 2
                 ;;
             --) shift 1
                 break
@@ -285,6 +290,18 @@ EOF
 
     if [[ ! -z $authorityKeyIdentifier ]]; then
         echo "authorityKeyIdentifier=keyid" >> "$kAlias/$x509CACNF"
+    fi
+
+    if [[ ${#subjectAltName[@]} -ne 0 ]]; then
+        echo "subjectAltName = @alt_name" >> "$kAlias/$x509CACNF"
+    fi
+
+    if [[ ${#subjectAltName[@]} -ne 0 ]]; then
+        echo "[ alt_name ]" >> "$kAlias/$x509CACNF"
+
+        for name in "${subjectAltName[@]}"; do
+            echo "$name" >> "$kAlias/$x509CACNF"
+        done
     fi
 }
 
@@ -1006,6 +1023,7 @@ B<x509CertSign>
 [B<--noBasicConstraints>]
 [B<--notAfter> I<ENDDATE>]
 [B<--notBefore> I<STARTDATE>]
+[B<--subjectAltName> I<ALTNAME>]
 [B<-t> I<TYPE>]
 [B<-v> I<version>]
 B<--CA> I<CAAlias>
@@ -1096,6 +1114,42 @@ Use C<date -d I<STARTDATE>> to verify if it represents the date you want.
 
 By default C<5 years ago> for I<ca> role, C<now> for all others.
 
+=item B<--subjectAltName> I<ALTNAME>
+
+Specify the Subject Alternative Name extension items to add. The format is
+similar to the B<DN>, first the literal added, then equals sign (=) and
+finally the value added.
+
+The literals supported are:
+
+=over
+
+=item I<email>
+
+Email address in the form:
+
+    username@domainname
+
+=item I<URI>
+
+Full Uniform Resource Identifier, with protocol, host name and location.
+
+=item I<DNS>
+
+DNS host name
+
+=item I<IP>
+
+An IP Address, both IPv4 and IPv6 is supported
+
+=back
+
+Note that if you want multiple literals of the same type, you need to specify
+the order in which they will be placed by appending position after a dot:
+
+    DNS.1=example.com
+    DNS.2=www.example.com
+
 =item B<-t> I<TYPE>
 
 Sets the general type of certificate: C<CA>, C<webserver> or C<webclient>.
@@ -1155,6 +1209,8 @@ x509CertSign() {
     local basicKeyUsage=""
     # distinguished name of the signed certificate
     local certDN=()
+    # Subject Alternative Name of the signed certificate
+    local subjectAltName=()
 
     #
     # parse options
@@ -1169,6 +1225,7 @@ x509CertSign() {
         -l bcPathLen: \
         -l bcCritical \
         -l md: \
+        -l subjectAltName: \
         -n x509CertSign -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509CertSign: can't parse options" >&2
@@ -1200,6 +1257,8 @@ x509CertSign() {
             --bcCritical) bcCritical="true"; shift 1
                 ;;
             --md) certMD="$2"; shift 2
+                ;;
+            --subjectAltName) subjectAltName+=("$2"); shift 2
                 ;;
             --) shift 1
                 break
@@ -1346,6 +1405,10 @@ x509CertSign() {
     if [[ ! -z $certMD ]]; then
         parameters+=("--md=$certMD")
     fi
+
+    for name in "${subjectAltName[@]}"; do
+        parameters+=("--subjectAltName=$name")
+    done
 
     # TODO add ability to disable this
     parameters+=("--subjectKeyIdentifier")
