@@ -143,6 +143,8 @@ __INTERNAL_x509GenConfig() {
     local authorityKeyIdentifier=""
     # variable that has the Subject Alternative Name split by lines
     local subjectAltName=()
+    # variable to store Authority Info Access (OCSP responder and CA file loc.)
+    local authorityInfoAccess=()
 
     #
     # parse options
@@ -154,6 +156,7 @@ __INTERNAL_x509GenConfig() {
         -l subjectKeyIdentifier \
         -l authorityKeyIdentifier \
         -l subjectAltName: \
+        -l authorityInfoAccess: \
         -n x509GenConfig -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509GenConfig: can't parse options" >&2
@@ -181,6 +184,8 @@ __INTERNAL_x509GenConfig() {
             --authorityKeyIdentifier) authorityKeyIdentifier="true"; shift 1
                 ;;
             --subjectAltName) subjectAltName+=("$2"); shift 2
+                ;;
+            --authorityInfoAccess) authorityInfoAccess+=("$2"); shift 2
                 ;;
             --) shift 1
                 break
@@ -296,13 +301,27 @@ EOF
         echo "subjectAltName = @alt_name" >> "$kAlias/$x509CACNF"
     fi
 
+    if [[ ${#authorityInfoAccess[@]} -ne 0 ]]; then
+        local aia_val=""
+        local separator=""
+        for aia in "${authorityInfoAccess[@]}"; do
+            aia_val+="${separator}${aia}"
+            separator=","
+        done
+        echo "authorityInfoAccess = $aia_val" >> "$kAlias/$x509CACNF"
+    fi
+
+    # subject alternative name section
+
     if [[ ${#subjectAltName[@]} -ne 0 ]]; then
+        echo "" >> "$kAlias/$x509CACNF"
         echo "[ alt_name ]" >> "$kAlias/$x509CACNF"
 
         for name in "${subjectAltName[@]}"; do
             echo "$name" >> "$kAlias/$x509CACNF"
         done
     fi
+
 }
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1023,6 +1042,7 @@ B<x509CertSign>
 [B<--noBasicConstraints>]
 [B<--notAfter> I<ENDDATE>]
 [B<--notBefore> I<STARTDATE>]
+[B<--ocspResponderURI> I<URI>]
 [B<--subjectAltName> I<ALTNAME>]
 [B<-t> I<TYPE>]
 [B<-v> I<version>]
@@ -1113,6 +1133,15 @@ so values like "1 year" (from now), "2 years ago", "3 months", "4 weeks ago",
 Use C<date -d I<STARTDATE>> to verify if it represents the date you want.
 
 By default C<5 years ago> for I<ca> role, C<now> for all others.
+
+=item B<--ocspResponderURI> I<URI>
+
+Add Authority Info Access extension that specifies location of the OCSP
+responder fo this certificate. The URI must be specified with protocol.
+
+For example:
+
+    http://ocsp.example.com/
 
 =item B<--subjectAltName> I<ALTNAME>
 
@@ -1211,6 +1240,8 @@ x509CertSign() {
     local certDN=()
     # Subject Alternative Name of the signed certificate
     local subjectAltName=()
+    # location of OCSP responder for the CA that issued this certificate
+    local ocspResponderURI=""
 
     #
     # parse options
@@ -1226,6 +1257,7 @@ x509CertSign() {
         -l bcCritical \
         -l md: \
         -l subjectAltName: \
+        -l ocspResponderURI: \
         -n x509CertSign -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509CertSign: can't parse options" >&2
@@ -1259,6 +1291,8 @@ x509CertSign() {
             --md) certMD="$2"; shift 2
                 ;;
             --subjectAltName) subjectAltName+=("$2"); shift 2
+                ;;
+            --ocspResponderURI) ocspResponderURI="$2"; shift 2
                 ;;
             --) shift 1
                 break
@@ -1409,6 +1443,10 @@ x509CertSign() {
     for name in "${subjectAltName[@]}"; do
         parameters+=("--subjectAltName=$name")
     done
+
+    if [[ ! -z $ocspResponderURI ]]; then
+        parameters+=("--authorityInfoAccess=OCSP;URI:${ocspResponderURI}")
+    fi
 
     # TODO add ability to disable this
     parameters+=("--subjectKeyIdentifier")
