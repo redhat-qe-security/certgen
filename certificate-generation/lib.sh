@@ -1066,7 +1066,7 @@ B<x509CertSign>
 [B<--noBasicConstraints>]
 [B<--notAfter> I<ENDDATE>]
 [B<--notBefore> I<STARTDATE>]
-[B<--ocspNoCheck> [I<CRITICAL>]]
+[B<--ocspNoCheck>[=I<CRITICAL>]]
 [B<--ocspResponderURI> I<URI>]
 [B<--subjectAltName> I<ALTNAME>]
 [B<-t> I<TYPE>]
@@ -1251,7 +1251,7 @@ Use C<date -d I<STARTDATE>> to verify if it represents the date you want.
 
 By default C<5 years ago> for I<ca> role, C<now> for all others.
 
-=item B<--ocspNoCheck> [I<CRITICAL>]
+=item B<--ocspNoCheck>[=I<CRITICAL>]
 
 Add the OCSP No Check extension to certificate, also known as
 id-pkix-ocsp-nocheck.
@@ -1608,6 +1608,7 @@ x509CertSign() {
         parameters+=("--extendedKeyUsage=$extendedKeyUsage")
     fi
 
+    # DER:05:00 is a DER encoding of NULL (empty)
     if [[ $ocspNoCheck == "true" ]]; then
         parameters+=("--x509v3Extension=ocspNoCheck=DER:05:00")
     fi
