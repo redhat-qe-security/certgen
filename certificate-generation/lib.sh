@@ -1201,11 +1201,19 @@ For example, you can't sign using ECDSA and MD5.
 SHA256 by default, will be updated to weakeast hash recommended by NIST or
 generally thought to be secure.
 
+=item B<--noAuthKeyId>
+
+Do not add the Authority Key Identifier extension to generated certificates.
+
 =item B<--noBasicConstraints>
 
 Remove Basic Constraints extension from the certificate completely.
 Note that in PKIX certificate validation, V3 certificate with no Basic
 Constraints will I<not> be considered to be a CA.
+
+=item B<--noSubjKeyId>
+
+Do not add the Subject Key Identifier extension to generated certificates.
 
 =item B<--notAfter> I<ENDDATE>
 
@@ -1346,6 +1354,8 @@ x509CertSign() {
     local extendedKeyUsage=""
     # flag to set the ocsp nocheck extension
     local ocspNoCheck=""
+    local noAuthKeyId=""
+    local noSubjKeyId=""
 
     #
     # parse options
@@ -1364,6 +1374,8 @@ x509CertSign() {
         -l ocspResponderURI: \
         -l extendedKeyUsage: \
         -l ocspNoCheck:: \
+        -l noAuthKeyId \
+        -l noSubjKeyId \
         -n x509CertSign -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509CertSign: can't parse options" >&2
@@ -1408,6 +1420,10 @@ x509CertSign() {
                     ocspNoCheck="critical"
                 fi
                 shift 2
+                ;;
+            --noAuthKeyId) noAuthKeyId="true"; shift 1
+                ;;
+            --noSubjKeyId) noSubjKeyId="true"; shift 1
                 ;;
             --) shift 1
                 break
@@ -1582,10 +1598,13 @@ x509CertSign() {
         parameters+=("--x509v3Extension=ocspNoCheck=critical,DER:05:00")
     fi
 
+    if [[ $noSubjKeyId != "true" ]]; then
+        parameters+=("--subjectKeyIdentifier")
+    fi
 
-    # TODO add ability to disable this
-    parameters+=("--subjectKeyIdentifier")
-    parameters+=("--authorityKeyIdentifier")
+    if [[ $noAuthKeyId != "true" ]]; then
+        parameters+=("--authorityKeyIdentifier")
+    fi
 
     __INTERNAL_x509GenConfig "${parameters[@]}" "$caAlias"
     if [ $? -ne 0 ]; then
