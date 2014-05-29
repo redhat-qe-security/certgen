@@ -1186,6 +1186,23 @@ Netscape Server Gated Crypto
 
 Allow the server to sign OCSP responses, also known as id_kp_OCSPSigning.
 
+=item I<ipsecEndSystem>
+
+Certificate can be used as the End System in IPsec
+
+=item I<ipsecTunnel>
+
+Certificate can be used in IPsec tunnels.
+
+=item I<ipsecUser>
+
+Certificate can be used by user (client).
+
+=item I<DVCS>
+
+Certificate can be used as a Data Validation and Certification Server (a trusted
+third party).
+
 =back
 
 By default undefined for C<CA> role, I<serverAuth> for C<webserver> role and
