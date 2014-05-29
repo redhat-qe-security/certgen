@@ -1657,6 +1657,85 @@ x509CertSign() {
     fi
 }
 
+true <<'=cut'
+=pod
+
+=head2 x509Key()
+
+Return the key associated with given alias.
+
+=over 4
+
+B<x509Key>
+I<alias>
+
+=back
+
+The function returns on standard output the relative path of the file
+that contains the PAM formatted, unencrypted private key file.
+
+To be used for simple variable substitution on command line, e.g.:
+
+    openssl rsa -in $(x509Key ca) -noout -text
+
+Note that the function doesn't check if the private file was actually
+generated.
+
+=over
+
+=item I<alias>
+
+Name of the key to return key file for
+
+=back
+
+=cut
+
+function x509Key() {
+
+    echo "$1/$x509PKEY"
+}
+
+true <<'=cut'
+=pod
+
+=head2 x509Cert()
+
+Return the certificate associated with given alias.
+
+=over 4
+
+B<x509Cert>
+I<alias>
+
+=back
+
+The function returns on standard output the relative path of the file
+that contains the PAM formatted X.509 certificate associated with provided
+alias.
+
+To be used for simple variable substitution on command line, e.g.:
+
+    openssl x509 -in $(x509Cert ca) -noout -text
+
+Note that the function doesn't check if the certificate was actually signed
+before.
+
+=over
+
+=item I<alias>
+
+Name of the certificate-key pair to return the certificate for.
+
+=back
+
+=cut
+
+function x509Cert() {
+
+    echo "$1/$x509CERT"
+}
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #   Execution
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
