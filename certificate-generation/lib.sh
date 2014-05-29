@@ -1790,6 +1790,39 @@ function x509Cert() {
     echo "$1/$x509CERT"
 }
 
+true <<'=cut'
+=pod
+
+=head2 x509DumpCert()
+
+Output text version of certificate to standard output
+
+=ver 4
+
+B<x509DumpCert>
+I<alias>
+
+=back
+
+Used as a shorthand for C<openssl x509>:
+
+    openssl x509 -in $(x509Cert alias) -noout -text
+
+=over
+
+=item I<alias>
+
+Specify the name of the certificate to dump
+
+=back
+
+=cut
+
+function x509DumpCert(){
+
+    openssl x509 -in $(x509Cert "$1") -noout -text
+}
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #   Execution
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
