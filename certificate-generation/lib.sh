@@ -566,8 +566,6 @@ Sets the Basic Constraints flag for CA to false. Note that this unsets the
 default criticality flag for Basic Constraints. To restore it, use
 B<--bcCritical>.
 
-This is the default for C<webserver> and C<webclient> roles.
-
 =item B<--caTrue>
 
 Sets the Basic Constraints flag for CA to true. Note that this unsets
@@ -1495,9 +1493,8 @@ x509CertSign() {
             ca) basicConstraints="CA:TRUE"
                 bcCritical="true"
                 ;;
-            *) basicConstraints="CA:FALSE"
-                bcCritical="true"
-                ;;
+                # for other usages, the recommendation is to not define it at
+                # all
         esac
     fi
 
