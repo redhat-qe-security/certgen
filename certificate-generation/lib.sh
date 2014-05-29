@@ -137,7 +137,7 @@ __INTERNAL_x509GenConfig() {
     local basicKeyUsage=""
     # Basic Constraints to set
     local basicConstraints=""
-    # whatever to generate Subject Key Identifier extension
+    # value of the Subject Key Identifier extension
     local subjectKeyIdentifier=""
     # whatever to generate Authority Key Identifier extension
     local authorityKeyIdentifier=""
@@ -158,7 +158,7 @@ __INTERNAL_x509GenConfig() {
         -l basicKeyUsage: \
         -l basicConstraints: \
         -l subjectKeyIdentifier \
-        -l authorityKeyIdentifier \
+        -l authorityKeyIdentifier: \
         -l subjectAltName: \
         -l authorityInfoAccess: \
         -l extendedKeyUsage: \
@@ -187,7 +187,7 @@ __INTERNAL_x509GenConfig() {
                 ;;
             --subjectKeyIdentifier) subjectKeyIdentifier="true"; shift 1
                 ;;
-            --authorityKeyIdentifier) authorityKeyIdentifier="true"; shift 1
+            --authorityKeyIdentifier) authorityKeyIdentifier="$2"; shift 2
                 ;;
             --subjectAltName) subjectAltName+=("$2"); shift 2
                 ;;
@@ -266,7 +266,8 @@ default_md = $md
 default_startdate = $notBefore
 default_enddate   = $notAfter
 policy = policy_anything
-preserveDN = yes
+preserve = yes
+email_in_dn = no
 unique_subject = no
 database = $kAlias/$x509CAINDEX
 serial = $kAlias/$x509CASERIAL
@@ -314,7 +315,7 @@ EOF
     fi
 
     if [[ ! -z $authorityKeyIdentifier ]]; then
-        echo "authorityKeyIdentifier=keyid" >> "$kAlias/$x509CACNF"
+        echo "authorityKeyIdentifier=$authorityKeyIdentifier" >> "$kAlias/$x509CACNF"
     fi
 
     if [[ ${#subjectAltName[@]} -ne 0 ]]; then
@@ -526,7 +527,9 @@ B<x509SelfSign>
 [B<--CN> I<commonName>]
 [B<--DN> I<part-of-dn>]
 [B<--md> I<HASH>]
+[B<--noAuthKeyId>]
 [B<--noBasicConstraints>]
+[B<--noSubjKeyId>]
 [B<--notAfter> I<ENDDATE>]
 [B<--notBefore> I<STARTDATE>]
 [B<-t> I<type>]
@@ -643,11 +646,20 @@ For example, you can't sign using ECDSA and MD5.
 SHA256 by default, will be updated to weakeast hash recommended by NIST or
 generally thought to be secure.
 
+=item B<--noAuthKeyId>
+
+Do not set the Authority Key Identifier extension in the certificate.
+
 =item B<--noBasicConstraints>
 
 Remove Basic Constraints extension from the certificate completely.
 Note that in PKIX certificate validation, V3 certificate with no Basic
 Constraints will I<not> be considered to be a CA.
+
+=item B<--noSubjKeyId>
+
+Do not set the Subject Key Identifier extension in the certificate.
+Implies B<--noAuthKeyId>.
 
 =item B<--notAfter> I<ENDDATE>
 
@@ -725,6 +737,12 @@ x509SelfSign() {
     local bcCritical=""
     # set the message digest algorithm used for signing
     local certMD=""
+    # flag set when the Authority Key Identifier is not supposed to be
+    # added to certificate
+    local noAuthKeyId=""
+    # flag set when the Subject Key Identifier is not supposed to be added
+    # to certificate
+    local noSubjKeyId=""
 
     #
     # parse options
@@ -737,6 +755,8 @@ x509SelfSign() {
         -l noBasicConstraints \
         -l bcPathLen: \
         -l bcCritical \
+        -l noAuthKeyId \
+        -l noSubjKeyId \
         -l md: \
         -n x509SelfSign -- "$@")
     if [ $? -ne 0 ]; then
@@ -773,6 +793,10 @@ x509SelfSign() {
             --bcCritical) bcCritical="true"; shift 1
                 ;;
             --md) certMD="$2"; shift 2
+                ;;
+            --noAuthKeyId) noAuthKeyId="true"; shift 1
+                ;;
+            --noSubjKeyId) noSubjKeyId="true"; shift 1
                 ;;
             --) shift 1
                 break
@@ -894,6 +918,10 @@ x509SelfSign() {
         esac
     fi
 
+    if [[ $noSubjKeyId == "true" ]]; then
+        noAuthKeyId="true"
+    fi
+
     #
     # prepare configuration file for signing
     #
@@ -922,8 +950,9 @@ x509SelfSign() {
         parameters+=("--md=$certMD")
     fi
 
-    # it will be included only in V3 certs, so we can add it by default
-    parameters+=("--subjectKeyIdentifier")
+    if [[ $noSubjKeyId != "true" ]]; then
+        parameters+=("--subjectKeyIdentifier")
+    fi
 
     __INTERNAL_x509GenConfig "${parameters[@]}" "$kAlias"
     if [ $? -ne 0 ]; then
@@ -959,7 +988,8 @@ x509SelfSign() {
         caOptions+=("-extensions" "v3_ext")
     fi
 
-    # finally sign the certificate using the full CA functionality
+    # sign the certificate using the full CA functionality to get proper
+    # key id and subject key identifier
     openssl ca -config $kAlias/$x509CACNF -batch -keyfile $kAlias/$x509PKEY \
         -cert $kAlias/temp-$x509CERT -in $kAlias/$x509CSR \
         -out $kAlias/$x509CERT "${caOptions[@]}"
@@ -968,6 +998,29 @@ x509SelfSign() {
         return 1
     fi
 
+    mv "$kAlias/$x509CERT" "$kAlias/temp-$x509CERT"
+
+    # now we have a certificate with proper serial number, it's just missing
+    # Authority Key Identifier that references it, so we sign itself for the
+    # third time
+    if [[ $noAuthKeyId != "true" ]]; then
+        parameters+=("--authorityKeyIdentifier=keyid:always,issuer:always")
+    fi
+    # the serial number must be the same, so reset index and serial number
+    rm "$kAlias/$x509CAINDEX" "$kAlias/$x509CASERIAL"
+    __INTERNAL_x509GenConfig "${parameters[@]}" "$kAlias"
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
+
+    openssl ca -config $kAlias/$x509CACNF -batch -keyfile $kAlias/$x509PKEY \
+        -cert $kAlias/temp-$x509CERT -in $kAlias/$x509CSR \
+        -out $kAlias/$x509CERT "${caOptions[@]}"
+
+    if [ $? -ne 0 ]; then
+        echo "x509SelfSign: signing the certificate failed" >&2
+        return 1
+    fi
 }
 
 true <<'=cut'
