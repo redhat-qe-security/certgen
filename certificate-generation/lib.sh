@@ -145,6 +145,10 @@ __INTERNAL_x509GenConfig() {
     local subjectAltName=()
     # variable to store Authority Info Access (OCSP responder and CA file loc.)
     local authorityInfoAccess=()
+    # value of the Extended Key Usage extension
+    local extendedKeyUsage=""
+    # list of all the arbitrary X509v3 extensions
+    local x509v3Extension=()
 
     #
     # parse options
@@ -157,6 +161,8 @@ __INTERNAL_x509GenConfig() {
         -l authorityKeyIdentifier \
         -l subjectAltName: \
         -l authorityInfoAccess: \
+        -l extendedKeyUsage: \
+        -l x509v3Extension: \
         -n x509GenConfig -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509GenConfig: can't parse options" >&2
@@ -186,6 +192,10 @@ __INTERNAL_x509GenConfig() {
             --subjectAltName) subjectAltName+=("$2"); shift 2
                 ;;
             --authorityInfoAccess) authorityInfoAccess+=("$2"); shift 2
+                ;;
+            --extendedKeyUsage) extendedKeyUsage="$2"; shift 2
+                ;;
+            --x509v3Extension) x509v3Extension="$2"; shift 2
                 ;;
             --) shift 1
                 break
@@ -242,6 +252,12 @@ __INTERNAL_x509GenConfig() {
     fi
 
     cat > "$kAlias/$x509CACNF" <<EOF
+oid_section = new_oids
+
+[ new_oids ]
+ocspSigning = 1.3.6.1.5.5.7.3.9
+ocspNoCheck = 1.3.6.1.5.5.7.48.1.5
+
 [ ca ]
 default_ca = ca_cnf
 
@@ -289,6 +305,10 @@ EOF
         echo "keyUsage =$basicKeyUsage" >> "$kAlias/$x509CACNF"
     fi
 
+    if [[ ! -z $extendedKeyUsage ]]; then
+        echo "extendedKeyUsage =$extendedKeyUsage" >> "$kAlias/$x509CACNF"
+    fi
+
     if [[ ! -z $subjectKeyIdentifier ]]; then
         echo "subjectKeyIdentifier=hash" >> "$kAlias/$x509CACNF"
     fi
@@ -310,6 +330,11 @@ EOF
         done
         echo "authorityInfoAccess = $aia_val" >> "$kAlias/$x509CACNF"
     fi
+
+    local ext
+    for ext in "${x509v3Extension[@]}"; do
+        echo "$ext" >> "$kAlias/$x509CACNF"
+    done
 
     # subject alternative name section
 
@@ -1038,10 +1063,12 @@ B<x509CertSign>
 [B<--caFalse>]
 [B<--caTrue>]
 [B<--DN> I<DNPART>]
+[B<--extendedKeyUsage> I<EKU>]
 [B<--md> I<HASHNAME>]
 [B<--noBasicConstraints>]
 [B<--notAfter> I<ENDDATE>]
 [B<--notBefore> I<STARTDATE>]
+[B<--ocspNoCheck> [I<CRITICAL>]]
 [B<--ocspResponderURI> I<URI>]
 [B<--subjectAltName> I<ALTNAME>]
 [B<-t> I<TYPE>]
@@ -1099,6 +1126,73 @@ options.
 By default C<O = Example intermediate CA> for C<CA> role, C<CN = localhost>
 for C<webserver> role and C<CN = John Smith> for C<webclient> role.
 
+=item B<--extendedKeyUsage> I<EKU>
+
+Add the Extended Key Usage extension to the certificate. I<EKU> is a comma
+separated list of key usages. Both literal OIDs and names can be used.
+
+Define as empty string to remove the default value. Prepend C<critical,> before
+usage names to mark the extension as critical.
+
+Valid names are:
+
+=over
+
+=item I<serverAuth>
+
+SSL/TLS Server authentication
+
+=item I<clientAuth>
+
+SSL/TLS Client authentication
+
+=item I<codeSigning>
+
+Executable code signing
+
+=item I<emailProtection>
+
+Signing and encrypting S/MIME messages.
+
+=item I<timeStamping>
+
+Signing of trusted timestamps (required for Time Stamping Authority),
+many implementations require this use to be only one and marked as critical
+for the TSA to be considered valid.
+
+=item I<msCodeInd>
+
+Microsoft Individual Code Signing (authnticode)
+
+=item I<msCodeCom>
+
+Microsoft Commercial Code Signing (authenticode)
+
+=item I<msCTLSign>
+
+Microsoft Trust List signing
+
+=item I<msSGC>
+
+Microsoft Server Gated Cryptography
+
+=item I<msEFS>
+
+Microsoft Encrypted File System
+
+=item I<nsSGC>
+
+Netscape Server Gated Crypto
+
+=item I<ocspSigning>
+
+Allow the server to sign OCSP responses, also known as id_kp_OCSPSigning.
+
+=back
+
+By default undefined for C<CA> role, I<serverAuth> for C<webserver> role and
+I<clientAuth,emailProtection> for C<webclient>.
+
 =item B<--md> I<HASHNAME>
 
 Sets the cryptographic hash (message digest) for signing certificates.
@@ -1133,6 +1227,14 @@ so values like "1 year" (from now), "2 years ago", "3 months", "4 weeks ago",
 Use C<date -d I<STARTDATE>> to verify if it represents the date you want.
 
 By default C<5 years ago> for I<ca> role, C<now> for all others.
+
+=item B<--ocspNoCheck> [I<CRITICAL>]
+
+Add the OCSP No Check extension to certificate, also known as
+id-pkix-ocsp-nocheck.
+
+I<CRITICAL> is the optional argument that, if provided (with any value, though
+C<critical> is recommended), will mark the extension as critical.
 
 =item B<--ocspResponderURI> I<URI>
 
@@ -1242,6 +1344,10 @@ x509CertSign() {
     local subjectAltName=()
     # location of OCSP responder for the CA that issued this certificate
     local ocspResponderURI=""
+    # value for the Extended Key Usage extension
+    local extendedKeyUsage=""
+    # flag to set the ocsp nocheck extension
+    local ocspNoCheck=""
 
     #
     # parse options
@@ -1258,6 +1364,8 @@ x509CertSign() {
         -l md: \
         -l subjectAltName: \
         -l ocspResponderURI: \
+        -l extendedKeyUsage: \
+        -l ocspNoCheck:: \
         -n x509CertSign -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509CertSign: can't parse options" >&2
@@ -1293,6 +1401,15 @@ x509CertSign() {
             --subjectAltName) subjectAltName+=("$2"); shift 2
                 ;;
             --ocspResponderURI) ocspResponderURI="$2"; shift 2
+                ;;
+            --extendedKeyUsage) extendedKeyUsage="$2"; shift 2
+                ;;
+            --ocspNoCheck) if [[ -z $2 ]]; then
+                    ocspNoCheck="true"
+                else
+                    ocspNoCheck="critical"
+                fi
+                shift 2
                 ;;
             --) shift 1
                 break
@@ -1412,6 +1529,15 @@ x509CertSign() {
         esac
     fi
 
+    if [[ -z $extendedKeyUsage ]]; then
+        case $certRole in
+            webserver) extendedKeyUsage="serverAuth"
+                ;;
+            webclient) extendedKeyUsage="clientAuth,emailProtection"
+                ;;
+        esac
+    fi
+
     #
     # prepare configuration file for signing
     #
@@ -1447,6 +1573,18 @@ x509CertSign() {
     if [[ ! -z $ocspResponderURI ]]; then
         parameters+=("--authorityInfoAccess=OCSP;URI:${ocspResponderURI}")
     fi
+
+    if [[ ! -z $extendedKeyUsage ]]; then
+        parameters+=("--extendedKeyUsage=$extendedKeyUsage")
+    fi
+
+    if [[ $ocspNoCheck == "true" ]]; then
+        parameters+=("--x509v3Extension=ocspNoCheck=DER:05:00")
+    fi
+    if [[ $ocspNoCheck == "critical" ]]; then
+        parameters+=("--x509v3Extension=ocspNoCheck=critical,DER:05:00")
+    fi
+
 
     # TODO add ability to disable this
     parameters+=("--subjectKeyIdentifier")
