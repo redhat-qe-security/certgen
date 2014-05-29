@@ -1515,10 +1515,12 @@ This library works correctly only when sourced. I.e.:
 #   is ready to serve.
 
 x509LibraryLoaded() {
-    local ret=0
-    getopt -T || ret=$?
+    local ret
+    getopt -T
+    ret=$?
     if [ ${ret} -ne 4 ]; then
-        echo "certificate-generation: error: old version of getopt" 1>&2
+        echo "certificate-generation: error: "\
+            "Non GNU enhanced version of getopt" 1>&2
         return 1
     fi
 
