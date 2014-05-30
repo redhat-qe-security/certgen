@@ -457,8 +457,8 @@ x509KeyGen() {
     #
 
     #upper case and lower case
-    kType=${kType^^}
-    kSize=${kSize,,}
+    kType=$(tr '[:lower:]' '[:upper:]' <<< ${kType})
+    kSize=$(tr '[:upper:]' '[:lower:]' <<< ${kSize})
 
     if [[ -z $kType ]]; then
         echo "x509KeyGen: Key type can't be empty" >&2
@@ -824,7 +824,7 @@ x509SelfSign() {
         return 1
     fi
 
-    certRole=${certRole,,}
+    certRole=$(tr '[:upper:]' '[:lower:]' <<< ${certRole})
     if [[ $certRole != "ca" ]] && [[ $certRole != "webserver" ]] \
         && [[ $certRole != "webclient" ]]; then
 
@@ -1551,7 +1551,7 @@ x509CertSign() {
         return 1
     fi
 
-    certRole=${certRole,,}
+    certRole=$(tr '[:upper:]' '[:lower:]' <<< ${certRole})
     if [[ $certRole != "ca" ]] && [[ $certRole != "webserver" ]] \
         && [[ $certRole != "webclient" ]]; then
 
