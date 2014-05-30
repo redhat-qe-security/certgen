@@ -25,7 +25,7 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 export TEST=/CoreOS/openssl/Library/certgen
-export TESTVERSION=1.0
+export TESTVERSION=2.0
 
 BUILT_FILES=
 
