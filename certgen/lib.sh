@@ -1822,7 +1822,7 @@ true <<'=cut'
 
 Output text version of certificate to standard output
 
-=ver 4
+=over 4
 
 B<x509DumpCert>
 I<alias>
@@ -1846,6 +1846,41 @@ Specify the name of the certificate to dump
 function x509DumpCert(){
 
     openssl x509 -in $(x509Cert "$1") -noout -text
+}
+
+true <<'=cut'
+=pod
+
+=head2 x509RmAlias()
+
+Remove private key, certificate and settings related to given alias.
+
+=over 4
+
+B<x509RmAlias>
+I<alias>
+
+=back
+
+=over
+
+=item I<alias>
+
+Name of the private key to remove
+
+=back
+
+=cut
+
+function x509RmAlias() {
+
+    if [[ -e $1/$x509PKEY ]]; then
+        rm -rf "$1"
+        return $?
+    else
+        echo "Alias does not refer to certgen library directory" >&2
+        return 1
+    fi
 }
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
