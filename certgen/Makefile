@@ -1,6 +1,6 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-#   Makefile of /CoreOS/openssl/Library/certificate-generation
+#   Makefile of /CoreOS/openssl/Library/certgen
 #   Description: Library for creating X.509 certificates for any use
 #   Author: Hubert Kario <hkario@redhat.com>
 #
@@ -24,7 +24,7 @@
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-export TEST=/CoreOS/openssl/Library/certificate-generation
+export TEST=/CoreOS/openssl/Library/certgen
 export TESTVERSION=1.0
 
 BUILT_FILES=
@@ -55,7 +55,7 @@ $(METADATA): Makefile
 	@echo "TestTime:        2m" >> $(METADATA)
 	@echo "RunFor:          openssl" >> $(METADATA)
 	@echo "Requires:        openssl" >> $(METADATA)
-	@echo "Provides:        library(openssl/certificate-generation)" >> $(METADATA)
+	@echo "Provides:        library(openssl/certgen)" >> $(METADATA)
 	@echo "Priority:        Normal" >> $(METADATA)
 	@echo "License:         GPLv2" >> $(METADATA)
 	@echo "Confidential:    no" >> $(METADATA)

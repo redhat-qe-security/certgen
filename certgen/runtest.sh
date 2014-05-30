@@ -2,7 +2,7 @@
 # vim: dict+=/usr/share/beakerlib/dictionary.vim cpt=.,w,b,u,t,i,k
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-#   runtest.sh of /CoreOS/openssl/Library/certificate-generation
+#   runtest.sh of /CoreOS/openssl/Library/certgen
 #   Description: Library for creating X.509 certificates for any use
 #   Author: Hubert Kario <hkario@redhat.com>
 #
@@ -35,7 +35,7 @@ PHASE=${PHASE:-Test}
 
 rlJournalStart
     rlPhaseStartSetup
-        rlRun "rlImport openssl/certificate-generation"
+        rlRun "rlImport openssl/certgen"
         rlRun "TmpDir=\$(mktemp -d)" 0 "Creating tmp directory"
         rlRun "pushd $TmpDir"
     rlPhaseEnd

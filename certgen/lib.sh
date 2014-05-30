@@ -2,7 +2,7 @@
 # vim: dict+=/usr/share/beakerlib/dictionary.vim cpt=.,w,b,u,t,i,k
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-#   lib.sh of /CoreOS/openssl/Library/certificate-generation
+#   lib.sh of /CoreOS/openssl/Library/certgen
 #   Description: Library for creating X.509 certificates for any use
 #   Author: Hubert Kario <hkario@redhat.com>
 #
@@ -33,8 +33,7 @@ true <<'=cut'
 
 =head1 NAME
 
-openssl/certificate-generation - Library for creating X.509 certificates for
-any use
+openssl/certgen - Library for creating X.509 certificates for any use
 
 =head1 DESCRIPTION
 
@@ -1856,7 +1855,7 @@ x509LibraryLoaded() {
     getopt -T
     ret=$?
     if [ ${ret} -ne 4 ]; then
-        echo "certificate-generation: error: "\
+        echo "certgen: error: "\
             "Non GNU enhanced version of getopt" 1>&2
         return 1
     fi
