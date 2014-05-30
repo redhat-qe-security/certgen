@@ -1673,7 +1673,7 @@ x509CertSign() {
     fi
 
     if [[ $noAuthKeyId != "true" ]]; then
-        parameters+=("--authorityKeyIdentifier")
+        parameters+=("--authorityKeyIdentifier=keyid:always,issuer:always")
     fi
 
     __INTERNAL_x509GenConfig "${parameters[@]}" "$caAlias"
