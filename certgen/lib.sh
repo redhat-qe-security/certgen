@@ -142,6 +142,8 @@ __INTERNAL_x509GenConfig() {
     local authorityKeyIdentifier=""
     # variable that has the Subject Alternative Name split by lines
     local subjectAltName=()
+    # variable to set when the Subject Alternative Name is to be marked critical
+    local subjectAltNameCritical=""
     # variable to store Authority Info Access (OCSP responder and CA file loc.)
     local authorityInfoAccess=()
     # value of the Extended Key Usage extension
@@ -159,6 +161,7 @@ __INTERNAL_x509GenConfig() {
         -l subjectKeyIdentifier \
         -l authorityKeyIdentifier: \
         -l subjectAltName: \
+        -l subjectAltNameCritical \
         -l authorityInfoAccess: \
         -l extendedKeyUsage: \
         -l x509v3Extension: \
@@ -195,6 +198,9 @@ __INTERNAL_x509GenConfig() {
             --extendedKeyUsage) extendedKeyUsage="$2"; shift 2
                 ;;
             --x509v3Extension) x509v3Extension="$2"; shift 2
+                ;;
+            --subjectAltNameCritical) subjectAltNameCritical="critical,";
+                shift 1
                 ;;
             --) shift 1
                 break
@@ -318,7 +324,8 @@ EOF
     fi
 
     if [[ ${#subjectAltName[@]} -ne 0 ]]; then
-        echo "subjectAltName = @alt_name" >> "$kAlias/$x509CACNF"
+        echo "subjectAltName =${subjectAltNameCritical} @alt_name" \
+            >> "$kAlias/$x509CACNF"
     fi
 
     if [[ ${#authorityInfoAccess[@]} -ne 0 ]]; then
@@ -1121,6 +1128,7 @@ B<x509CertSign>
 [B<--ocspNoCheck>[=I<CRITICAL>]]
 [B<--ocspResponderURI> I<URI>]
 [B<--subjectAltName> I<ALTNAME>]
+[B<--subjectAltNameCritical>]
 [B<-t> I<TYPE>]
 [B<-v> I<version>]
 B<--CA> I<CAAlias>
@@ -1356,6 +1364,10 @@ the order in which they will be placed by appending position after a dot:
     DNS.1=example.com
     DNS.2=www.example.com
 
+=item B<--subjectAltNameCritical>
+
+Mark the Subject Alternative Name as critical.
+
 =item B<-t> I<TYPE>
 
 Sets the general type of certificate: C<CA>, C<webserver> or C<webclient>.
@@ -1417,13 +1429,17 @@ x509CertSign() {
     local certDN=()
     # Subject Alternative Name of the signed certificate
     local subjectAltName=()
+    # flag set when Subject Alternative Name is to be marked critical
+    local subjectAltNameCritical=""
     # location of OCSP responder for the CA that issued this certificate
     local ocspResponderURI=""
     # value for the Extended Key Usage extension
     local extendedKeyUsage=""
     # flag to set the ocsp nocheck extension
     local ocspNoCheck=""
+    # flag to remove Authority Key Identifier extension from certificate
     local noAuthKeyId=""
+    # flag to remove Subject Key Identifier extension from certificate
     local noSubjKeyId=""
 
     #
@@ -1440,6 +1456,7 @@ x509CertSign() {
         -l bcCritical \
         -l md: \
         -l subjectAltName: \
+        -l subjectAltNameCritical \
         -l ocspResponderURI: \
         -l extendedKeyUsage: \
         -l ocspNoCheck:: \
@@ -1478,6 +1495,8 @@ x509CertSign() {
             --md) certMD="$2"; shift 2
                 ;;
             --subjectAltName) subjectAltName+=("$2"); shift 2
+                ;;
+            --subjectAltNameCritical) subjectAltNameCritical="true"; shift 1
                 ;;
             --ocspResponderURI) ocspResponderURI="$2"; shift 2
                 ;;
@@ -1651,6 +1670,10 @@ x509CertSign() {
     for name in "${subjectAltName[@]}"; do
         parameters+=("--subjectAltName=$name")
     done
+
+    if [[ $subjectAltNameCritical == "true" ]]; then
+        parameters+=("--subjectAltNameCritical")
+    fi
 
     if [[ ! -z $ocspResponderURI ]]; then
         parameters+=("--authorityInfoAccess=OCSP;URI:${ocspResponderURI}")
