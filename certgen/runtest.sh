@@ -31,37 +31,203 @@
 . /usr/share/beakerlib/beakerlib.sh || exit 1
 
 PACKAGE="openssl"
-PHASE=${PHASE:-Test}
 
 rlJournalStart
     rlPhaseStartSetup
         rlRun "rlImport openssl/certgen"
+        . ./lib.sh
         rlRun "TmpDir=\$(mktemp -d)" 0 "Creating tmp directory"
         rlRun "pushd $TmpDir"
     rlPhaseEnd
 
-    # Create file
-    if [[ "$PHASE" =~ "Create" ]]; then
-        rlPhaseStartTest "Create"
-            fileCreate
-        rlPhaseEnd
-    fi
+    rlPhaseStartTest "Sanity check"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca server"
+        rlAssertExists "ca"
+        rlAssertExists "server"
+        rlAssertExists "server/$x509PKEY"
+        rlAssertExists "server/$x509CERT"
+        rlRun -s "x509DumpCert ca"
+        # check default subject name
+        rlAssertGrep "Example CA" "$rlRun_LOG"
+        # check extensions
+        rlAssertGrep "Subject Key Identifier" "$rlRun_LOG"
+        rlAssertGrep "Authority Key Identifier" "$rlRun_LOG"
+        rlAssertGrep "Key Usage:.*critical" "$rlRun_LOG"
+        rlAssertGrep "Basic Constraints:.*critical" "$rlRun_LOG"
+        rlAssertGrep "Certificate Sign" "$rlRun_LOG"
+        rlAssertGrep "CRL Sign" "$rlRun_LOG"
+        rlAssertGrep "CA:TRUE" "$rlRun_LOG"
+        rlAssertNotGrep "Subject Alternative Name" "$rlRun_LOG"
+        rlRun "rm '$rlRun_LOG'"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "Example CA" "$rlRun_LOG"
+        rlAssertGrep "localhost" "$rlRun_LOG"
+        rlAssertGrep "Key Usage:.*critical" "$rlRun_LOG"
+        rlAssertGrep "Digital Signature" "$rlRun_LOG"
+        rlAssertGrep "Key Encipherment" "$rlRun_LOG"
+        rlAssertGrep "Key Agreement" "$rlRun_LOG"
+        rlAssertGrep "Extended Key Usage" "$rlRun_LOG"
+        rlAssertGrep "TLS Web Server Authentication" "$rlRun_LOG"
+        rlAssertGrep "Subject Key Identifier" "$rlRun_LOG"
+        rlAssertGrep "Authority Key Identifier" "$rlRun_LOG"
+        rlAssertNotGrep "Subject Alternative Name" "$rlRun_LOG"
+        rlAssertNotGrep "Basic Constraints" "$rlRun_LOG"
+        rlRun "rm '$rlRun_LOG'"
+        rlAssertExists "$(x509Key server)"
+        rlAssertExists "$(x509Cert server)"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
 
-    # Self test
-    if [[ "$PHASE" =~ "Test" ]]; then
-        rlPhaseStartTest "Test default name"
-            fileCreate
-            rlAssertExists "$fileFILENAME"
-        rlPhaseEnd
-        rlPhaseStartTest "Test filename in parameter"
-            fileCreate "parameter-file"
-            rlAssertExists "parameter-file"
-        rlPhaseEnd
-        rlPhaseStartTest "Test filename in variable"
-            FILENAME="variable-file" fileCreate
-            rlAssertExists "variable-file"
-        rlPhaseEnd
-    fi
+    rlPhaseStartTest "ECDSA support"
+        rlRun "x509KeyGen -t ecdsa ca"
+        rlRun "x509KeyGen -t ecdsa server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca server"
+        rlAssertExists "$(x509Cert server)"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "prime256v1" "$rlRun_LOG"
+        rlAssertGrep "ecdsa-with-SHA256" "$rlRun_LOG"
+        rlRun "rm '$rlRun_LOG'"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "DSA support"
+        rlRun "x509KeyGen -t dsa ca"
+        rlRun "x509KeyGen -t dsa server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca server"
+        rlAssertExists "$(x509Cert server)"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "dsaEncryption" "$rlRun_LOG"
+        rlAssertGrep "dsa_with_SHA256" "$rlRun_LOG"
+        rlRun "rm '$rlRun_LOG'"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "Certificate profiles"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen subca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca -t CA subca"
+        rlRun "x509CertSign --CA subca server"
+        rlAssertExists "$(x509Cert ca)"
+        rlAssertExists "$(x509Cert subca)"
+        rlAssertExists "$(x509Cert server)"
+        rlRun -s "x509DumpCert subca"
+        rlAssertGrep "CA:TRUE" "$rlRun_LOG"
+        rlAssertGrep "Certificate Sign" "$rlRun_LOG"
+        rlRun "rm '$rlRun_LOG'"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "Example intermediate CA" "$rlRun_LOG"
+        rlRun "rm '$rlRun_LOG'"
+        options=('-CAfile' "$(x509Cert ca)"
+            '-untrusted' "$(x509Cert subca)"
+            '-x509_strict'
+            "$(x509Cert server)")
+        rlRun -s "openssl verify ${options[*]}"
+        rlAssertGrep "OK" "$rlRun_LOG"
+        rlRun "rm '$rlRun_LOG'"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias subca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "Hash for signing"
+        rlRun "x509KeyGen ca"
+        rlRun "x509SelfSign --md sha512 ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509CertSign --CA ca --md sha512 server"
+        rlRun -s "x509DumpCert ca"
+        rlAssertGrep "sha512" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "sha512" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "Custom DN"
+        rlRun "x509KeyGen ca"
+        rlRun "x509SelfSign ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509CertSign --CA ca --DN 'O=RedHat Test' --DN 'OU=Quality Engineering' server"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "RedHat Test" "$rlRun_LOG"
+        rlAssertGrep "Quality Engineering" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "Extended Key Usage"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca --extendedKeyUsage critical,timeStamping server"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "Extended Key Usage:.*critical" "$rlRun_LOG"
+        rlAssertGrep "Time Stamping" "$rlRun_LOG"
+        rlAssertNotGrep "Web Server Authentication" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "OCSP no check"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca --ocspNoCheck server"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "OCSP No Check" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "OCSP responder URL"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca --ocspResponderURI http://ocsp.example.com server"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "Authority Information Access" "$rlRun_LOG"
+        rlAssertGrep "ocsp[.]example[.]com" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "Subject Alt Name"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        options=(
+            '--subjectAltNameCritical'
+            '--subjectAltName' 'DNS.1=example.com'
+            '--subjectAltName' 'DNS.2=localhost'
+            '--subjectAltName' 'IP.1=192.168.0.1'
+            '--subjectAltName' 'IP.2=::1'
+            )
+        rlRun "x509CertSign --CA ca --DN 'O=Test' ${options[*]} server"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "Subject Alternative Name.*critical" "$rlRun_LOG"
+        rlAssertGrep "example[.]com" "$rlRun_LOG"
+        rlAssertGrep "localhost" "$rlRun_LOG"
+        rlAssertGrep "192[.]168[.]0[.]1" "$rlRun_LOG"
+        rlAssertGrep "0:0:0:0:0:0:0:1" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
 
     rlPhaseStartCleanup
         rlRun "popd"
