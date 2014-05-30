@@ -1975,7 +1975,8 @@ I<Not> used for certificate or CRL signing.
 
 =item I<keyEncipherment>
 
-Encrypting keying material, used with RSA based TLS cipher suites.
+Encrypting keying material, used with TLS cipher suites that use RSA key
+exchange.
 
 =item I<dataEncipherment>
 
