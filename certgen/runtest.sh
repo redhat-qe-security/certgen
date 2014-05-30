@@ -35,6 +35,9 @@ PACKAGE="openssl"
 rlJournalStart
     rlPhaseStartSetup
         rlRun "rlImport openssl/certgen"
+        if rlIsRHEL '<6'; then
+            x509FORMAT="+%y%m%d%H%M%SZ"
+        fi
         . ./lib.sh
         rlRun "TmpDir=\$(mktemp -d)" 0 "Creating tmp directory"
         rlRun "pushd $TmpDir"
@@ -82,19 +85,21 @@ rlJournalStart
         rlRun "x509RmAlias server"
     rlPhaseEnd
 
-    rlPhaseStartTest "ECDSA support"
-        rlRun "x509KeyGen -t ecdsa ca"
-        rlRun "x509KeyGen -t ecdsa server"
-        rlRun "x509SelfSign ca"
-        rlRun "x509CertSign --CA ca server"
-        rlAssertExists "$(x509Cert server)"
-        rlRun -s "x509DumpCert server"
-        rlAssertGrep "prime256v1" "$rlRun_LOG"
-        rlAssertGrep "ecdsa-with-SHA256" "$rlRun_LOG"
-        rlRun "rm '$rlRun_LOG'"
-        rlRun "x509RmAlias ca"
-        rlRun "x509RmAlias server"
-    rlPhaseEnd
+    if ! rlIsRHEL '<6' && rlIsRHEL '<6.5'; then
+        rlPhaseStartTest "ECDSA support"
+            rlRun "x509KeyGen -t ecdsa ca"
+            rlRun "x509KeyGen -t ecdsa server"
+            rlRun "x509SelfSign ca"
+            rlRun "x509CertSign --CA ca server"
+            rlAssertExists "$(x509Cert server)"
+            rlRun -s "x509DumpCert server"
+            rlAssertGrep "prime256v1" "$rlRun_LOG"
+            rlAssertGrep "ecdsa-with-SHA256" "$rlRun_LOG"
+            rlRun "rm '$rlRun_LOG'"
+            rlRun "x509RmAlias ca"
+            rlRun "x509RmAlias server"
+        rlPhaseEnd
+    fi
 
     rlPhaseStartTest "DSA support"
         rlRun "x509KeyGen -t dsa ca"
@@ -104,7 +109,12 @@ rlJournalStart
         rlAssertExists "$(x509Cert server)"
         rlRun -s "x509DumpCert server"
         rlAssertGrep "dsaEncryption" "$rlRun_LOG"
-        rlAssertGrep "dsa_with_SHA256" "$rlRun_LOG"
+        # DSA with SHA256 is unsupported with old OpenSSL (<1.0.0)
+        if rlIsRHEL 5; then
+            rlAssertGrep "dsaWithSHA1" "$rlRun_LOG"
+        else
+            rlAssertGrep "dsa_with_SHA256" "$rlRun_LOG"
+        fi
         rlRun "rm '$rlRun_LOG'"
         rlRun "x509RmAlias ca"
         rlRun "x509RmAlias server"
