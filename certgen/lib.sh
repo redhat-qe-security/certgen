@@ -1447,6 +1447,7 @@ x509CertSign() {
     #
 
     local TEMP=$(getopt -o v:t: -l CA: \
+        -l DN: \
         -l notAfter: \
         -l notBefore: \
         -l caTrue \
@@ -1477,6 +1478,8 @@ x509CertSign() {
             -t) certRole="$2"; shift 2
                 ;;
             --CA) caAlias="$2"; shift 2
+                ;;
+            --DN) certDN+=("$2"); shift 2
                 ;;
             --notAfter) notAfter="$2"; shift 2
                 ;;
