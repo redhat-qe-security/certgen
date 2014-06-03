@@ -85,7 +85,7 @@ rlJournalStart
         rlRun "x509RmAlias server"
     rlPhaseEnd
 
-    if ! rlIsRHEL '<6' && rlIsRHEL '<6.5'; then
+    if ! rlIsRHEL '<6' && ! rlIsRHEL '<6.5'; then
         rlPhaseStartTest "ECDSA support"
             rlRun "x509KeyGen -t ecdsa ca"
             rlRun "x509KeyGen -t ecdsa server"
