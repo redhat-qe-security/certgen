@@ -1115,6 +1115,7 @@ Create a certificate signed by a given alias.
 =over 4
 
 B<x509CertSign>
+[B<--basicKeyUsage> I<BASICKEYUSAGE>]
 [B<--bcCritical>]
 [B<--bcPathLen> I<PATHLEN>]
 [B<--caFalse>]
@@ -1137,6 +1138,15 @@ I<alias>
 =back
 
 =over
+
+=item B<--basicKeyUsage> I<BASICKEYUSAGE>
+
+Specify the settings for basic key usage extension.
+See B<X.509 EXTENSIONS> section for list of available keywords.
+
+Default "critical, keyCertSign, cRLSign" for C<CA> role,
+"critical, digitalSignature, keyEncipherment, keyAgreement" for C<webserver>
+role and "digitalSignature, keyEncipherment" for C<webclient> role.
 
 =item B<--bcCritical>
 
@@ -1455,6 +1465,7 @@ x509CertSign() {
         -l noBasicConstraints \
         -l bcPathLen: \
         -l bcCritical \
+        -l basicKeyUsage: \
         -l md: \
         -l subjectAltName: \
         -l subjectAltNameCritical \
@@ -1494,6 +1505,8 @@ x509CertSign() {
             --bcPathLen) bcPathLen="$2"; shift 2
                 ;;
             --bcCritical) bcCritical="true"; shift 1
+                ;;
+            --basicKeyUsage) basicKeyUsage="$2"; shift 2
                 ;;
             --md) certMD="$2"; shift 2
                 ;;
