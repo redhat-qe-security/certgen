@@ -89,6 +89,18 @@ Name of file in which certificates will be placed. F<cert.pem> by default
 
 Name of the file with certificate signing request. F<request.csr> by default.
 
+=item B<x509DERCERT>
+
+Name of the file where certificates encoded in DER format will be placed.
+F<cert.crt> by default. Note that those files are generated on demand only by
+B<x509Cert> function.
+
+=item B<x509DERKEY>
+
+Name of the file where private keys encoded in DER format will be placed.
+F<key.key> by default. Note that those file are generated on demand only by
+B<x509Key> function.
+
 =item B<x509FORMAT>
 
 Formatting required by the I<openssl> tool for generating certificates.
@@ -109,7 +121,9 @@ functions may cause the library to misbehave.
 =cut
 
 x509PKEY=${x509PKEY:-key.pem}
+x509DERKEY=${x509DERKEY:-key.key}
 x509CERT=${x509CERT:-cert.pem}
+x509DERCERT=${x509DERCERT:-cert.crt}
 x509CSR=${x509CSR:-request.csr}
 x509CACNF=${x509CACNF:-ca.cnf}
 x509CAINDEX=${x509CAINDEX:-index.txt}
@@ -1760,6 +1774,7 @@ Return the key associated with given alias.
 
 B<x509Key>
 I<alias>
+[B<--der>]
 
 =back
 
@@ -1771,7 +1786,7 @@ To be used for simple variable substitution on command line, e.g.:
     openssl rsa -in $(x509Key ca) -noout -text
 
 Note that the function doesn't check if the private file was actually
-generated.
+generated or that conversion to DER format was successful.
 
 =over
 
@@ -1779,13 +1794,51 @@ generated.
 
 Name of the key to return key file for
 
+=item B<--der>
+
+Convert a copy of the private key to DER format and output the location of the
+DER encoded file (binary, not base64).
+
 =back
 
 =cut
 
 function x509Key() {
 
-    echo "$1/$x509PKEY"
+    # generate DER file?
+    local der="false"
+    # name of the key to return
+    local kAlias
+
+    local TEMP=$(getopt -o h -l der \
+        -n x509Key -- "$@")
+    if [ $? -ne 0 ]; then
+        echo "x509Key: can't parse options" >&2
+        return 1
+    fi
+
+    eval set -- "$TEMP"
+
+    while true ; do
+        case "$1" in
+            --der) der="true"; shift 1
+                ;;
+            --) shift 1
+                break
+                ;;
+        esac
+    done
+
+    kAlias="$1"
+
+    if [[ $der == "true" ]]; then
+        if [[ ! -e $kAlias/$x509DERKEY ]]; then
+            openssl pkey -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
+        fi
+        echo "$kAlias/$x509DERKEY"
+    else
+        echo "$kAlias/$x509PKEY"
+    fi
 }
 
 true <<'=cut'
@@ -1799,6 +1852,7 @@ Return the certificate associated with given alias.
 
 B<x509Cert>
 I<alias>
+[B<--der>]
 
 =back
 
@@ -1811,7 +1865,7 @@ To be used for simple variable substitution on command line, e.g.:
     openssl x509 -in $(x509Cert ca) -noout -text
 
 Note that the function doesn't check if the certificate was actually signed
-before.
+before or that the conversion to the DER format was successful.
 
 =over
 
@@ -1819,13 +1873,51 @@ before.
 
 Name of the certificate-key pair to return the certificate for.
 
+=item B<--der>
+
+Convert a copy of the certificate to the DER format and print on standard
+output the file name of the copy.
+
 =back
 
 =cut
 
 function x509Cert() {
 
-    echo "$1/$x509CERT"
+    # generate DER file?
+    local der="false"
+    # name of the key to return
+    local kAlias
+
+    local TEMP=$(getopt -o h -l der\
+        -n x509Cert -- "$@")
+    if [ $? -ne 0 ]; then
+        echo "x509Cert: can't parse options" >&2
+        return 1
+    fi
+
+    eval set -- "$TEMP"
+
+    while true ; do
+        case "$1" in
+            --der) der="true"; shift 1
+                ;;
+            --) shift 1
+                break
+                ;;
+        esac
+    done
+
+    kAlias="$1"
+
+    if [[ $der == "true" ]]; then
+        if [[ ! -e $kAlias/$x509DERCERT ]]; then
+            openssl x509 -in "$kAlias/$x509CERT" -outform DER -out "$kAlias/$x509DERCERT"
+        fi
+        echo "$kAlias/$x509DERCERT"
+    else
+        echo "$kAlias/$x509CERT"
+    fi
 }
 
 true <<'=cut'
