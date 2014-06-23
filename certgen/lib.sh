@@ -101,6 +101,13 @@ Name of the file where private keys encoded in DER format will be placed.
 F<key.key> by default. Note that those file are generated on demand only by
 B<x509Key> function.
 
+=item B<x509FIRSTSERIAL>
+
+The first serial number that will be assigned to the certificate.
+Used when the CA self signes its certificate or when intermediate CA signes
+it first certificate. Must be a valid, nonegative hex number.
+C<01> by default.
+
 =item B<x509FORMAT>
 
 Formatting required by the I<openssl> tool for generating certificates.
@@ -128,6 +135,7 @@ x509CSR=${x509CSR:-request.csr}
 x509CACNF=${x509CACNF:-ca.cnf}
 x509CAINDEX=${x509CAINDEX:-index.txt}
 x509CASERIAL=${x509CASERIAL:-serial}
+x509FIRSTSERIAL=${x509FIRSTSERIAL:-01}
 x509FORMAT=${x509FORMAT:-+%Y%m%d%H%M%SZ}
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -267,7 +275,7 @@ __INTERNAL_x509GenConfig() {
 
     touch $kAlias/$x509CAINDEX
     if [ ! -e $kAlias/$x509CASERIAL ]; then
-        echo 01 > $kAlias/$x509CASERIAL
+        echo $x509FIRSTSERIAL > $kAlias/$x509CASERIAL
     fi
 
     cat > "$kAlias/$x509CACNF" <<EOF
