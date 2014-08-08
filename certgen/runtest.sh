@@ -81,15 +81,17 @@ rlJournalStart
         rlRun "rm '$rlRun_LOG'"
         rlAssertExists "$(x509Key server)"
         rlAssertExists "$(x509Cert server)"
-        rlAssertExists "$(x509Key --der server)"
-        rlAssertExists "$(x509Cert --der server)"
-        rlAssertNotEquals "PEM and DER key files should have different names" "$(x509Key server)" "$(x509Key --der server)"
-        rlAssertNotEquals "PEM and DER cert files should have different names" "$(x509Cert server)" "$(x509Cert --der server)"
-        rlAssertDiffer "$(x509Key server)" "$(x509Key --der server)"
-        rlAssertDiffer "$(x509Cert server)" "$(x509Cert --der server)"
-        a=$(openssl rsa -modulus -in $(x509Key server) -noout)
-        b=$(openssl rsa -modulus -in $(x509Key server --der) -inform DER -noout)
-        rlRun "[[ $a == $b ]]" 0 "Check if files have the same private key inside"
+        if ! rlIsRHEL 5; then
+            rlAssertExists "$(x509Key --der server)"
+            rlAssertExists "$(x509Cert --der server)"
+            rlAssertNotEquals "PEM and DER key files should have different names" "$(x509Key server)" "$(x509Key --der server)"
+            rlAssertNotEquals "PEM and DER cert files should have different names" "$(x509Cert server)" "$(x509Cert --der server)"
+            rlAssertDiffer "$(x509Key server)" "$(x509Key --der server)"
+            rlAssertDiffer "$(x509Cert server)" "$(x509Cert --der server)"
+            a=$(openssl rsa -modulus -in $(x509Key server) -noout)
+            b=$(openssl rsa -modulus -in $(x509Key server --der) -inform DER -noout)
+            rlRun "[[ $a == $b ]]" 0 "Check if files have the same private key inside"
+        fi
         rlRun "x509RmAlias ca"
         rlRun "x509RmAlias server"
     rlPhaseEnd
