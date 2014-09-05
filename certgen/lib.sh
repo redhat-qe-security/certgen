@@ -197,7 +197,7 @@ __INTERNAL_x509GenConfig() {
 
     while true ; do
         case "$1" in
-            --dn) dn+=("$2"); shift 2
+            --dn) dn=("${dn[@]}" "$2"); shift 2
                 ;;
             --md) md="$2"; shift 2
                 ;;
@@ -213,9 +213,9 @@ __INTERNAL_x509GenConfig() {
                 ;;
             --authorityKeyIdentifier) authorityKeyIdentifier="$2"; shift 2
                 ;;
-            --subjectAltName) subjectAltName+=("$2"); shift 2
+            --subjectAltName) subjectAltName=("${subjectAltName[@]}" "$2"); shift 2
                 ;;
-            --authorityInfoAccess) authorityInfoAccess+=("$2"); shift 2
+            --authorityInfoAccess) authorityInfoAccess=("${authorityInfoAccess[@]}" "$2"); shift 2
                 ;;
             --extendedKeyUsage) extendedKeyUsage="$2"; shift 2
                 ;;
@@ -354,7 +354,7 @@ EOF
         local aia_val=""
         local separator=""
         for aia in "${authorityInfoAccess[@]}"; do
-            aia_val+="${separator}${aia}"
+            aia_val="${aia_val}${separator}${aia}"
             separator=","
         done
         echo "authorityInfoAccess = $aia_val" >> "$kAlias/$x509CACNF"
@@ -802,7 +802,7 @@ x509SelfSign() {
                 ;;
             --CN) certCN="$2"; shift 2
                 ;;
-            --DN) certDN+=("$2"); shift 2
+            --DN) certDN=("${certDN[@]}" "$2"); shift 2
                 ;;
             --notAfter) notAfter="$2"; shift 2
                 ;;
@@ -868,16 +868,16 @@ x509SelfSign() {
     fi
 
     if [ ! -z "$certCN" ]; then
-        certDN+=("CN = $certCN")
+        certDN=("${certDN[@]}" "CN = $certCN")
     fi
 
     if [ ${#certDN[@]} -eq 0 ]; then
         case $certRole in
-            ca) certDN+=("O = Example CA")
+            ca) certDN=("${certDN[@]}" "O = Example CA")
                 ;;
-            webserver) certDN+=("CN = localhost")
+            webserver) certDN=("${certDN[@]}" "CN = localhost")
                 ;;
-            webclient) certDN+=("CN = John Smith")
+            webclient) certDN=("${certDN[@]}" "CN = John Smith")
                 ;;
             *) echo "x509SelfSign: Unknown cert role: $certRole" >&2
                 return 1
@@ -925,9 +925,9 @@ x509SelfSign() {
     if [[ $basicConstraints == "undefined" ]]; then
         basicConstraintsOption=""
     else
-        basicConstraintsOption+="${basicConstraints}"
+        basicConstraintsOption="${basicConstraintsOption}${basicConstraints}"
         if [[ ! -z $bcPathLen ]]; then
-            basicConstraintsOption+=", pathlen: ${bcPathLen}"
+            basicConstraintsOption="${basicConstraintsOption}, pathlen: ${bcPathLen}"
         fi
     fi
 
@@ -936,7 +936,7 @@ x509SelfSign() {
             ca) basicKeyUsage="critical, keyCertSign, cRLSign"
                 ;;
             webserver) basicKeyUsage="critical, digitalSignature, "
-                basicKeyUsage+="keyEncipherment, keyAgreement"
+                basicKeyUsage="${basicKeyUsage}keyEncipherment, keyAgreement"
                 ;;
             webclient) basicKeyUsage="digitalSignature, keyEncipherment"
                 ;;
@@ -956,30 +956,30 @@ x509SelfSign() {
 
     local parameters=()
     for option in "${certDN[@]}"; do
-        parameters+=("--dn=$option")
+        parameters=("${parameters[@]}" "--dn=$option")
     done
 
     if [[ ! -z $notAfter ]]; then
-        parameters+=("--notAfter=$notAfter")
+        parameters=("${parameters[@]}" "--notAfter=$notAfter")
     fi
     if [[ ! -z $notBefore ]]; then
-        parameters+=("--notBefore=$notBefore")
+        parameters=("${parameters[@]}" "--notBefore=$notBefore")
     fi
 
     if [[ ! -z $basicConstraintsOption ]]; then
-        parameters+=("--basicConstraints=$basicConstraintsOption")
+        parameters=("${parameters[@]}" "--basicConstraints=$basicConstraintsOption")
     fi
 
     if [[ ! -z $basicKeyUsage ]]; then
-        parameters+=("--basicKeyUsage=$basicKeyUsage")
+        parameters=("${parameters[@]}" "--basicKeyUsage=$basicKeyUsage")
     fi
 
     if [[ ! -z $certMD ]]; then
-        parameters+=("--md=$certMD")
+        parameters=("${parameters[@]}" "--md=$certMD")
     fi
 
     if [[ $noSubjKeyId != "true" ]]; then
-        parameters+=("--subjectKeyIdentifier")
+        parameters=("${parameters[@]}" "--subjectKeyIdentifier")
     fi
 
     __INTERNAL_x509GenConfig "${parameters[@]}" "$kAlias"
@@ -1011,9 +1011,9 @@ x509SelfSign() {
     fi
 
     local caOptions=()
-    caOptions+=("-preserveDN")
+    caOptions=("${caOptions[@]}" "-preserveDN")
     if [[ $certV == "3" ]]; then
-        caOptions+=("-extensions" "v3_ext")
+        caOptions=("${caOptions[@]}" "-extensions" "v3_ext")
     fi
 
     # sign the certificate using the full CA functionality to get proper
@@ -1032,7 +1032,7 @@ x509SelfSign() {
     # Authority Key Identifier that references it, so we sign itself for the
     # third time
     if [[ $noAuthKeyId != "true" ]]; then
-        parameters+=("--authorityKeyIdentifier=keyid:always,issuer:always")
+        parameters=("${parameters[@]}" "--authorityKeyIdentifier=keyid:always,issuer:always")
     fi
     # the serial number must be the same, so reset index and serial number
     rm "$kAlias/$x509CAINDEX" "$kAlias/$x509CASERIAL"
@@ -1512,7 +1512,7 @@ x509CertSign() {
                 ;;
             --CA) caAlias="$2"; shift 2
                 ;;
-            --DN) certDN+=("$2"); shift 2
+            --DN) certDN=("${certDN[@]}" "$2"); shift 2
                 ;;
             --notAfter) notAfter="$2"; shift 2
                 ;;
@@ -1532,7 +1532,7 @@ x509CertSign() {
                 ;;
             --md) certMD="$2"; shift 2
                 ;;
-            --subjectAltName) subjectAltName+=("$2"); shift 2
+            --subjectAltName) subjectAltName=("${subjectAltName[@]}" "$2"); shift 2
                 ;;
             --subjectAltNameCritical) subjectAltNameCritical="true"; shift 1
                 ;;
@@ -1596,11 +1596,11 @@ x509CertSign() {
 
     if [ ${#certDN[@]} -eq 0 ]; then
         case $certRole in
-            ca) certDN+=("O = Example intermediate CA")
+            ca) certDN=("${certDN[@]}" "O = Example intermediate CA")
                 ;;
-            webserver) certDN+=("CN = localhost")
+            webserver) certDN=("${certDN[@]}" "CN = localhost")
                 ;;
-            webclient) certDN+=("CN = John Smith")
+            webclient) certDN=("${certDN[@]}" "CN = John Smith")
                 ;;
             *) echo "x509CertSign: Unknown cert role: $certRole" >&2
                 return 1
@@ -1647,9 +1647,9 @@ x509CertSign() {
     if [[ $basicConstraints == "undefined" ]]; then
         basicConstraintsOption=""
     else
-        basicConstraintsOption+="${basicConstraints}"
+        basicConstraintsOption="${basicConstraintsOption}${basicConstraints}"
         if [[ ! -z $bcPathLen ]]; then
-            basicConstraintsOption+=", pathlen: ${bcPathLen}"
+            basicConstraintsOption="${basicConstraintsOption}, pathlen: ${bcPathLen}"
         fi
     fi
 
@@ -1658,7 +1658,7 @@ x509CertSign() {
             ca) basicKeyUsage="critical, keyCertSign, cRLSign"
                 ;;
             webserver) basicKeyUsage="critical, digitalSignature, "
-                basicKeyUsage+="keyEncipherment, keyAgreement"
+                basicKeyUsage="${basicKeyUsage}keyEncipherment, keyAgreement"
                 ;;
             webclient) basicKeyUsage="digitalSignature, keyEncipherment"
                 ;;
@@ -1683,58 +1683,58 @@ x509CertSign() {
 
     local parameters=()
     for option in "${certDN[@]}"; do
-        parameters+=("--dn=$option")
+        parameters=("${parameters[@]}" "--dn=$option")
     done
 
     if [[ ! -z $notAfter ]]; then
-        parameters+=("--notAfter=$notAfter")
+        parameters=("${parameters[@]}" "--notAfter=$notAfter")
     fi
     if [[ ! -z $notBefore ]]; then
-        parameters+=("--notBefore=$notBefore")
+        parameters=("${parameters[@]}" "--notBefore=$notBefore")
     fi
 
     if [[ ! -z $basicConstraintsOption ]]; then
-        parameters+=("--basicConstraints=$basicConstraintsOption")
+        parameters=("${parameters[@]}" "--basicConstraints=$basicConstraintsOption")
     fi
 
     if [[ ! -z $basicKeyUsage ]]; then
-        parameters+=("--basicKeyUsage=$basicKeyUsage")
+        parameters=("${parameters[@]}" "--basicKeyUsage=$basicKeyUsage")
     fi
 
     if [[ ! -z $certMD ]]; then
-        parameters+=("--md=$certMD")
+        parameters=("${parameters[@]}" "--md=$certMD")
     fi
 
     for name in "${subjectAltName[@]}"; do
-        parameters+=("--subjectAltName=$name")
+        parameters=("${parameters[@]}" "--subjectAltName=$name")
     done
 
     if [[ $subjectAltNameCritical == "true" ]]; then
-        parameters+=("--subjectAltNameCritical")
+        parameters=("${parameters[@]}" "--subjectAltNameCritical")
     fi
 
     if [[ ! -z $ocspResponderURI ]]; then
-        parameters+=("--authorityInfoAccess=OCSP;URI:${ocspResponderURI}")
+        parameters=("${parameters[@]}" "--authorityInfoAccess=OCSP;URI:${ocspResponderURI}")
     fi
 
     if [[ ! -z $extendedKeyUsage ]]; then
-        parameters+=("--extendedKeyUsage=$extendedKeyUsage")
+        parameters=("${parameters[@]}" "--extendedKeyUsage=$extendedKeyUsage")
     fi
 
     # DER:05:00 is a DER encoding of NULL (empty)
     if [[ $ocspNoCheck == "true" ]]; then
-        parameters+=("--x509v3Extension=ocspNoCheck=DER:05:00")
+        parameters=("${parameters[@]}" "--x509v3Extension=ocspNoCheck=DER:05:00")
     fi
     if [[ $ocspNoCheck == "critical" ]]; then
-        parameters+=("--x509v3Extension=ocspNoCheck=critical,DER:05:00")
+        parameters=("${parameters[@]}" "--x509v3Extension=ocspNoCheck=critical,DER:05:00")
     fi
 
     if [[ $noSubjKeyId != "true" ]]; then
-        parameters+=("--subjectKeyIdentifier")
+        parameters=("${parameters[@]}" "--subjectKeyIdentifier")
     fi
 
     if [[ $noAuthKeyId != "true" ]]; then
-        parameters+=("--authorityKeyIdentifier=keyid:always,issuer:always")
+        parameters=("${parameters[@]}" "--authorityKeyIdentifier=keyid:always,issuer:always")
     fi
 
     __INTERNAL_x509GenConfig "${parameters[@]}" "$caAlias"
@@ -1754,9 +1754,9 @@ x509CertSign() {
     fi
 
     local caOptions=()
-    caOptions+=("-preserveDN")
+    caOptions=("${caOptions[@]}" "-preserveDN")
     if [[ $certV == "3" ]]; then
-        caOptions+=("-extensions" "v3_ext")
+        caOptions=("${caOptions[@]}" "-extensions" "v3_ext")
     fi
 
     openssl ca -config "$caAlias/$x509CACNF" -batch \
