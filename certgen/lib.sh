@@ -694,7 +694,7 @@ Implies B<--noAuthKeyId>.
 Sets the date after which the certificate won't be valid.
 Uses date(1) for conversion so values like "1 year" (from now), "2 years ago",
 "3 months", "4 weeks ago", "2 days ago", etc. work just as well as values
-like "20100101123500Z".
+like "201001011235Z".
 Use C<date -d I<ENDDATE>> to verify if it represent the date you want.
 
 By default C<10 years> for I<ca> role, C<1 year> for all others.
@@ -703,7 +703,7 @@ By default C<10 years> for I<ca> role, C<1 year> for all others.
 
 Sets the date since which the certificate is valid. Uses date(1) for conversion
 so values like "1 year" (from now), "2 years ago", "3 months", "4 weeks ago",
-"2 days ago", etc. work just as well as values like "20100101123500Z".
+"2 days ago", etc. work just as well as values like "201001011235Z".
 Use C<date -d I<STARTDATE>> to verify if it represents the date you want.
 
 By default C<5 years ago> for I<ca> role, C<now> for all others.
@@ -1329,7 +1329,7 @@ Do not add the Subject Key Identifier extension to generated certificates.
 Sets the date after which the certificate won't be valid.
 Uses date(1) for conversion so values like "1 year" (from now), "2 years ago",
 "3 months", "4 weeks ago", "2 days ago", etc. work just as well as values
-like "20100101123500Z".
+like "201001011235Z".
 Use C<date -d I<ENDDATE>> to verify if it represent the date you want.
 
 By default C<10 years> for I<ca> role, C<1 year> for all others.
@@ -1338,7 +1338,7 @@ By default C<10 years> for I<ca> role, C<1 year> for all others.
 
 Sets the date since which the certificate is valid. Uses date(1) for conversion
 so values like "1 year" (from now), "2 years ago", "3 months", "4 weeks ago",
-"2 days ago", etc. work just as well as values like "20100101123500Z".
+"2 days ago", etc. work just as well as values like "201001011235Z".
 Use C<date -d I<STARTDATE>> to verify if it represents the date you want.
 
 By default C<5 years ago> for I<ca> role, C<now> for all others.
