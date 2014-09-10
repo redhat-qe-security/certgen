@@ -250,6 +250,16 @@ rlJournalStart
         rlRun "x509RmAlias server"
     rlPhaseEnd
 
+    rlPhaseStartTest "Certificate validity period"
+        rlRun "x509KeyGen ca"
+        rlRun "x509SelfSign --notBefore '20100101Z' --notAfter '20400101Z' ca"
+        rlRun -s "x509DumpCert ca"
+        rlAssertGrep "Not Before: Jan  1 00:00:00 2010 GMT" "$rlRun_LOG"
+        rlAssertGrep "Not After : Jan  1 00:00:00 2040 GMT" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+    rlPhaseEnd
+
     rlPhaseStartCleanup
         rlRun "popd"
         rlRun "rm -r $TmpDir" 0 "Removing tmp directory"

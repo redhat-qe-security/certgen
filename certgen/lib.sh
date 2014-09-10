@@ -776,7 +776,7 @@ x509SelfSign() {
     # parse options
     #
 
-    local TEMP=$(getopt -o t:v: -l CN: -l DN: -l notAfter: -l notBefore \
+    local TEMP=$(getopt -o t:v: -l CN: -l DN: -l notAfter: -l notBefore: \
         -l basicKeyUsage: \
         -l caTrue \
         -l caFalse \
