@@ -145,7 +145,7 @@ x509FORMAT=${x509FORMAT:-+%Y%m%d%H%M%SZ}
 __INTERNAL_x509GenConfig() {
 
     # variable that has the DN broken up by items, most significant first
-    local dn=()
+    declare -a dn
     # hash used to sign the certificate
     local md="sha256"
     # current time in seconds from UNIX epoch
@@ -163,15 +163,15 @@ __INTERNAL_x509GenConfig() {
     # whatever to generate Authority Key Identifier extension
     local authorityKeyIdentifier=""
     # variable that has the Subject Alternative Name split by lines
-    local subjectAltName=()
+    declare -a subjectAltName
     # variable to set when the Subject Alternative Name is to be marked critical
     local subjectAltNameCritical=""
     # variable to store Authority Info Access (OCSP responder and CA file loc.)
-    local authorityInfoAccess=()
+    declare -a authorityInfoAccess
     # value of the Extended Key Usage extension
     local extendedKeyUsage=""
     # list of all the arbitrary X509v3 extensions
-    local x509v3Extension=()
+    declare -a x509v3Extension
 
     #
     # parse options
@@ -750,7 +750,7 @@ x509SelfSign() {
     # common name of certificate
     local certCN
     # parts of DN (array)
-    local certDN=()
+    declare -a certDN
     # date since which the cert is valid
     local notBefore=""
     # date until which the cert is valid
@@ -954,7 +954,7 @@ x509SelfSign() {
     # prepare configuration file for signing
     #
 
-    local parameters=()
+    declare -a parameters
     for option in "${certDN[@]}"; do
         parameters=("${parameters[@]}" "--dn=$option")
     done
@@ -1010,7 +1010,7 @@ x509SelfSign() {
         return 1
     fi
 
-    local caOptions=()
+    declare -a caOptions
     caOptions=("${caOptions[@]}" "-preserveDN")
     if [[ $certV == "3" ]]; then
         caOptions=("${caOptions[@]}" "-extensions" "v3_ext")
@@ -1458,9 +1458,9 @@ x509CertSign() {
     # sets the Basic Key Usage
     local basicKeyUsage=""
     # distinguished name of the signed certificate
-    local certDN=()
+    declare -a certDN
     # Subject Alternative Name of the signed certificate
-    local subjectAltName=()
+    declare -a subjectAltName
     # flag set when Subject Alternative Name is to be marked critical
     local subjectAltNameCritical=""
     # location of OCSP responder for the CA that issued this certificate
@@ -1681,7 +1681,7 @@ x509CertSign() {
     # prepare configuration file for signing
     #
 
-    local parameters=()
+    declare -a parameters
     for option in "${certDN[@]}"; do
         parameters=("${parameters[@]}" "--dn=$option")
     done
@@ -1753,7 +1753,7 @@ x509CertSign() {
         return 1
     fi
 
-    local caOptions=()
+    declare -a caOptions
     caOptions=("${caOptions[@]}" "-preserveDN")
     if [[ $certV == "3" ]]; then
         caOptions=("${caOptions[@]}" "-extensions" "v3_ext")
