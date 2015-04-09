@@ -52,7 +52,7 @@ $(METADATA): Makefile
 	@echo "Path:            $(TEST_DIR)" >> $(METADATA)
 	@echo "Description:     Library for creating X.509 certificates for any use" >> $(METADATA)
 	@echo "Type:            Library" >> $(METADATA)
-	@echo "TestTime:        10m" >> $(METADATA)
+	@echo "TestTime:        30m" >> $(METADATA)
 	@echo "RunFor:          openssl" >> $(METADATA)
 	@echo "Requires:        openssl" >> $(METADATA)
 	@echo "Provides:        library(openssl/certgen)" >> $(METADATA)
