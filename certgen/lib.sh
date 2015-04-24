@@ -114,7 +114,7 @@ Formatting required by the I<openssl> tool for generating certificates.
 For RHEL6 and later it should be set to C<+%Y%m%d%H%M%SZ>.
 For RHEL5 it should be set to C<+%y%m%d%H%M%SZ>.
 
-Defaults to the RHEL6 and RHEL7 compatible setting.
+Defaults to version supported by locally installed OpenSSL
 
 =item B<x509PKEY>
 
@@ -136,7 +136,11 @@ x509CACNF=${x509CACNF:-ca.cnf}
 x509CAINDEX=${x509CAINDEX:-index.txt}
 x509CASERIAL=${x509CASERIAL:-serial}
 x509FIRSTSERIAL=${x509FIRSTSERIAL:-01}
-x509FORMAT=${x509FORMAT:-+%Y%m%d%H%M%SZ}
+if openssl version | grep -q '0[.]9[.].'; then
+    x509FORMAT=${x509FORMAT:-+%y%m%d%H%M%SZ}
+else
+    x509FORMAT=${x509FORMAT:-+%Y%m%d%H%M%SZ}
+fi
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #   Internal Functions

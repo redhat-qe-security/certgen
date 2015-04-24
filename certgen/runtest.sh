@@ -35,9 +35,6 @@ PACKAGE="openssl"
 rlJournalStart
     rlPhaseStartSetup
         rlRun "rlImport openssl/certgen"
-        if rlIsRHEL '<6'; then
-            x509FORMAT="+%y%m%d%H%M%SZ"
-        fi
         . ./lib.sh
         rlRun "TmpDir=\$(mktemp -d)" 0 "Creating tmp directory"
         rlRun "pushd $TmpDir"
