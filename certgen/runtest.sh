@@ -86,7 +86,7 @@ rlJournalStart
         rlAssertDiffer "$(x509Cert server)" "$(x509Cert --der server)"
         a=$(openssl rsa -modulus -in $(x509Key server) -noout)
         b=$(openssl rsa -modulus -in $(x509Key server --der) -inform DER -noout)
-        rlRun "[[ $a == $b ]]" 0 "Check if files have the same private key inside"
+        rlRun "[[ '$a' == '$b' ]]" 0 "Check if files have the same private key inside"
         rlRun "x509RmAlias ca"
         rlRun "x509RmAlias server"
     rlPhaseEnd
@@ -113,6 +113,11 @@ rlJournalStart
         rlRun "x509SelfSign ca"
         rlRun "x509CertSign --CA ca server"
         rlAssertExists "$(x509Cert server)"
+        rlAssertDiffer "$(x509Key server)" "$(x509Key server --der)"
+        rlAssertExists "$(x509Key server --der)"
+        a=$(openssl dsa -modulus -in $(x509Key server --der) -inform DER -noout)
+        b=$(openssl dsa -modulus -in $(x509Key server) -noout)
+        rlRun "[[ '$a' == '$b' ]]" 0 "Check if files have the same private key inside"
         rlRun -s "x509DumpCert server"
         rlAssertGrep "dsaEncryption" "$rlRun_LOG"
         # DSA with SHA256 is unsupported with old OpenSSL (<1.0.0)
