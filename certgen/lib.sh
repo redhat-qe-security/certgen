@@ -1848,7 +1848,8 @@ function x509Key() {
             # openssl 0.9.8 doesn't have pkey subcommand, simulate it with
             # rsa and dsa subcommands, ec subcommand is not supported there
             if openssl version | grep -q '0[.]9[.].'; then
-                if grep -q 'BEGIN DSA PRIVATE KEY' "$kAlias/$x509PKEY"; then
+                if grep -q 'BEGIN DSA PRIVATE KEY' "$kAlias/$x509PKEY" \
+                    || [ -e "$kAlias/dsa*.pem" ]; then
                     openssl dsa -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
                 elif grep -q 'BEGIN RSA PRIVATE KEY' "$kAlias/$x509PKEY" \
                     || grep -q 'BEGIN PRIVATE KEY' "$kAlias/$x509PKEY"; then
