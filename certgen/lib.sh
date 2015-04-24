@@ -1850,9 +1850,11 @@ function x509Key() {
             if openssl version | grep -q '0[.]9[.].'; then
                 if grep -q 'BEGIN DSA PRIVATE KEY' "$kAlias/$x509PKEY"; then
                     openssl dsa -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
-                elif grep -q 'BEGIN RSA PRIVATE KEY' "$kAlias/$x509PKEY"; then
+                elif grep -q 'BEGIN RSA PRIVATE KEY' "$kAlias/$x509PKEY" \
+                    || grep -q 'BEGIN PRIVATE KEY' "$kAlias/$x509PKEY"; then
                     openssl rsa -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
                 else
+                    echo "Private key in unknown format" >&2
                     return 1
                 fi
 
