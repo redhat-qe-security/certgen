@@ -136,7 +136,9 @@ rlJournalStart
         rlRun "x509KeyGen subca"
         rlRun "x509KeyGen server"
         rlRun "x509SelfSign ca"
+        # type CA
         rlRun "x509CertSign --CA ca -t CA subca"
+        # default type - webserver
         rlRun "x509CertSign --CA subca server"
         rlAssertExists "$(x509Cert ca)"
         rlAssertExists "$(x509Cert subca)"
@@ -147,6 +149,8 @@ rlJournalStart
         rlRun "rm '$rlRun_LOG'"
         rlRun -s "x509DumpCert server"
         rlAssertGrep "Example intermediate CA" "$rlRun_LOG"
+        rlAssertNotGrep "TLS Web Client Authentication" "$rlRun_LOG"
+        rlAssertGrep "TLS Web Server Authentication" "$rlRun_LOG"
         rlRun "rm '$rlRun_LOG'"
         options=('-CAfile' "$(x509Cert ca)"
             '-untrusted' "$(x509Cert subca)"
@@ -155,9 +159,20 @@ rlJournalStart
         rlRun -s "openssl verify ${options[*]}"
         rlAssertGrep "OK" "$rlRun_LOG"
         rlRun "rm '$rlRun_LOG'"
+        rlRun "x509KeyGen client"
+        # type webclient
+        rlRun "x509CertSign --CA subca -t webclient client"
+        rlAssertExists "$(x509Cert client)"
+        rlRun -s "x509DumpCert client"
+        rlAssertNotGrep "CA:TRUE" "$rlRun_LOG"
+        rlAssertNotGrep "Certifcate Sign" "$rlRun_LOG"
+        rlAssertGrep "John Smith" "$rlRun_LOG"
+        rlAssertGrep "TLS Web Client Authentication" "$rlRun_LOG"
+        rlAssertNotGrep "TLS Web Server Authentication" "$rlRun_LOG"
         rlRun "x509RmAlias ca"
         rlRun "x509RmAlias subca"
         rlRun "x509RmAlias server"
+        rlRun "x509RmAlias client"
     rlPhaseEnd
 
     rlPhaseStartTest "Hash for signing"
