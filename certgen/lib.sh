@@ -522,12 +522,12 @@ x509KeyGen() {
             return 1
         fi
     elif [[ $kType == "DSA" ]]; then
-        openssl dsaparam "$kSize" -out "$kAlias/dsa$kSize.pem"
+        openssl dsaparam "$kSize" -out "$kAlias/dsa_params.pem"
         if [ $? -ne 0 ]; then
             echo "x509KeyGen: Parameter generation failed" >&2
             return 1
         fi
-        openssl gendsa -out "$kAlias/$x509PKEY" "$kAlias/dsa${kSize}.pem"
+        openssl gendsa -out "$kAlias/$x509PKEY" "$kAlias/dsa_params.pem"
         if [ $? -ne 0 ]; then
             echo "x509KeyGen: Key generation failed" >&2
             return 1
@@ -1847,10 +1847,8 @@ function x509Key() {
         if [[ ! -e $kAlias/$x509DERKEY ]]; then
             # openssl 0.9.8 doesn't have pkey subcommand, simulate it with
             # rsa and dsa subcommands, ec subcommand is not supported there
-            if openssl version | grep -q '0[.]9[.].'; then
-                dsaparams=("$kAlias/dsa*.pem")
-                if grep -q 'BEGIN DSA PRIVATE KEY' "$kAlias/$x509PKEY" \
-                    || [[ -e ${dsaparams[0]} ]]; then
+            if ! openssl version | grep -q '0[.]9[.].'; then
+                if [[ -e "$kAlias/dsa_params.pem" ]]; then
                     openssl dsa -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
                 elif grep -q 'BEGIN RSA PRIVATE KEY' "$kAlias/$x509PKEY" \
                     || grep -q 'BEGIN PRIVATE KEY' "$kAlias/$x509PKEY"; then
