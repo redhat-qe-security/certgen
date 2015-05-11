@@ -50,6 +50,7 @@ rlJournalStart
         rlAssertExists "server/$x509PKEY"
         rlAssertExists "server/$x509CERT"
         rlRun -s "x509DumpCert ca"
+        rlLogInfo "Checking default settings for CA"
         # check default subject name
         rlAssertGrep "Example CA" "$rlRun_LOG"
         # check extensions
@@ -63,6 +64,7 @@ rlJournalStart
         rlAssertNotGrep "Subject Alternative Name" "$rlRun_LOG"
         rlRun "rm '$rlRun_LOG'"
         rlRun -s "x509DumpCert server"
+        rlLogInfo "Checking default settings for server certificates"
         rlAssertGrep "Example CA" "$rlRun_LOG"
         rlAssertGrep "localhost" "$rlRun_LOG"
         rlAssertGrep "Key Usage:.*critical" "$rlRun_LOG"
@@ -76,10 +78,15 @@ rlJournalStart
         rlAssertNotGrep "Subject Alternative Name" "$rlRun_LOG"
         rlAssertNotGrep "Basic Constraints" "$rlRun_LOG"
         rlRun "rm '$rlRun_LOG'"
+        rlLogInfo "Checking key and certificate export"
         rlAssertExists "$(x509Key server)"
         rlAssertExists "$(x509Cert server)"
         rlAssertExists "$(x509Key --der server)"
         rlAssertExists "$(x509Cert --der server)"
+        rlRun "x509Cert --pkcs12 server" 0 "export to PKCS#12 format"
+        rlAssertExists "$(x509Cert --pkcs12 server)"
+        rlRyn "grep localhost $(x509Cert --pkcs12 server)" 0 "Check if file is unencrypted"
+        rlLogInfo "Checking if exported keys and certs match independent of format"
         rlAssertNotEquals "PEM and DER key files should have different names" "$(x509Key server)" "$(x509Key --der server)"
         rlAssertNotEquals "PEM and DER cert files should have different names" "$(x509Cert server)" "$(x509Cert --der server)"
         rlAssertDiffer "$(x509Key server)" "$(x509Key --der server)"
@@ -87,6 +94,7 @@ rlJournalStart
         a=$(openssl rsa -modulus -in $(x509Key server) -noout)
         b=$(openssl rsa -modulus -in $(x509Key server --der) -inform DER -noout)
         rlRun "[[ '$a' == '$b' ]]" 0 "Check if files have the same private key inside"
+        rlLogInfo "Clean up for phase"
         rlRun "x509RmAlias ca"
         rlRun "x509RmAlias server"
     rlPhaseEnd

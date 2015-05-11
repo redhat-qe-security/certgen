@@ -116,6 +116,12 @@ For RHEL5 it should be set to C<+%y%m%d%H%M%SZ>.
 
 Defaults to version supported by locally installed OpenSSL
 
+=item B<x509PKCS12>
+
+Name of the file where certificates and keys in PKCS#12 format will be placed.
+F<bundle.p12> by default. Not that those files are generated on demand only
+by B<x509Key> and B<x509Cert> functions.
+
 =item B<x509PKEY>
 
 Name of file with private and public key. F<key.pem> by default
@@ -131,6 +137,7 @@ x509PKEY=${x509PKEY:-key.pem}
 x509DERKEY=${x509DERKEY:-key.key}
 x509CERT=${x509CERT:-cert.pem}
 x509DERCERT=${x509DERCERT:-cert.crt}
+x509PKCS12=${x509PKCS12:-bundle.p12}
 x509CSR=${x509CSR:-request.csr}
 x509CACNF=${x509CACNF:-ca.cnf}
 x509CAINDEX=${x509CAINDEX:-index.txt}
@@ -1880,6 +1887,7 @@ Return the certificate associated with given alias.
 B<x509Cert>
 I<alias>
 [B<--der>]
+[B<--pkcs12>]
 
 =back
 
@@ -1892,7 +1900,11 @@ To be used for simple variable substitution on command line, e.g.:
     openssl x509 -in $(x509Cert ca) -noout -text
 
 Note that the function doesn't check if the certificate was actually signed
-before or that the conversion to the DER format was successful.
+before.
+
+Note that the DER format and PKCS#12 format files are cached, as such, if you
+regenerated certificate you will have to remove them to get the new cert in
+those formats.
 
 =over
 
@@ -1905,6 +1917,12 @@ Name of the certificate-key pair to return the certificate for.
 Convert a copy of the certificate to the DER format and print on standard
 output the file name of the copy.
 
+=item B<--pkcs12>
+
+Convert a copy of the certificate to the PKCS#12 format and print on standard
+output the file name of the copy. Friendly name of the certificate in PKCS#12
+file is set to the alias.
+
 =back
 
 =cut
@@ -1913,10 +1931,14 @@ function x509Cert() {
 
     # generate DER file?
     local der="false"
+    # generate PKCS12 file?
+    local pkcs12="false"
+    # password to use (empty by default)
+    local password=""
     # name of the key to return
     local kAlias
 
-    local TEMP=$(getopt -o h -l der\
+    local TEMP=$(getopt -o h -l der -l pkcs12\
         -n x509Cert -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509Cert: can't parse options" >&2
@@ -1929,19 +1951,44 @@ function x509Cert() {
         case "$1" in
             --der) der="true"; shift 1
                 ;;
+            --pkcs12) pkcs12="true"; shift 1
+                ;;
             --) shift 1
                 break
                 ;;
         esac
     done
 
+    if [ $der == "true" ] && [ $pkcs12 == "true" ]; then
+        echo "Can't export DER and PKCS12 files at the same time!" >&2
+        return 1
+    fi
+
     kAlias="$1"
 
     if [[ $der == "true" ]]; then
         if [[ ! -e $kAlias/$x509DERCERT ]]; then
             openssl x509 -in "$kAlias/$x509CERT" -outform DER -out "$kAlias/$x509DERCERT"
+            if [ $? -ne 0 ]; then
+                echo "File conversion failed" >&2
+                return 1
+            fi
         fi
         echo "$kAlias/$x509DERCERT"
+    elif [[ $pkcs12 == "true" ]]; then
+        if [[ ! -e $kAlias/$x509PKCS12 ]]; then
+            # note that NSS doesn't support MACs other that MD5 and SHA1
+            # see RHBZ#1220573
+            openssl pkcs12 -export -out "$kAlias/$x509PKCS12" \
+                -in "$kAlias/$x509CERT" -caname "$kAlias" \
+                -nokeys -passout "pass:$password" \
+                -certpbe NONE -macalg SHA1
+            if [ $? -ne 0 ]; then
+                echo "File conversion failed" >&2
+                return 1
+            fi
+        fi
+        echo "$kAlias/$x509PKCS12"
     else
         echo "$kAlias/$x509CERT"
     fi
