@@ -99,6 +99,35 @@ rlJournalStart
         rlRun "x509RmAlias server"
     rlPhaseEnd
 
+    rlPhaseStartTest "PKCS12 handling"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca server"
+
+        rlLogInfo "Test export of just the key"
+        rlRun "x509Key --pkcs12 server"
+        rlAssertExists "$(x509Key --pkcs12 server)"
+        rlRun -s "openssl pkcs12 -in $(x509Key --pkcs12 server) -info -passin pass: -nodes"
+        rlAssertGrep "server" "$rlRun_LOG"
+        rlAssertGrep "BEGIN.*KEY" "$rlRun_LOG" -E
+        rlAssertNotGrep "BEGIN CERTIFICATE" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "rm $(x509Key --pkcs12 server)"
+
+        rlLogInfo "Test export of key with certificate"
+        rlRun "x509Key --pkcs12 --with-cert server"
+        rlAssertExists "$(x509Key --pkcs12 --with-cert server)"
+        rlRun -s "openssl pkcs12 -in $(x509Key --pkcs12 server) -info -passin pass: -nodes"
+        rlAssertGrep "server" "$rlRun_LOG"
+        rlAssertGrep "BEGIN.*KEY" "$rlRun_LOG" -E
+        rlAssertGrep "BEGIN CERTIFICATE" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
     if ! rlIsRHEL '<6' && ! rlIsRHEL '<6.5'; then
         rlPhaseStartTest "ECDSA support"
             rlRun "x509KeyGen -t ecdsa ca"

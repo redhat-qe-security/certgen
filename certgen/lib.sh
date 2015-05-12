@@ -1794,6 +1794,8 @@ Return the key associated with given alias.
 B<x509Key>
 I<alias>
 [B<--der>]
+[B<--pkcs12>]
+[B<--with-cert>]
 
 =back
 
@@ -1818,6 +1820,20 @@ Name of the key to return key file for
 Convert a copy of the private key to DER format and output the location of the
 DER encoded file (binary, not base64).
 
+=item B<--pkcs12>
+
+Convert a copy of the private key to PKCS#12 format and output the location
+of PKCS#12 encoded file. The key will be encrypted with null password and
+PKCS#5 v2 PBE/PBKDF and AES-256-CBC cipher. Its friendly name will be set to
+alias.
+
+Note that the export does cache the last exported file, so if exported the
+key or certificate to PKCS#12 format before, you will have to `rm` the previous
+file first.
+
+=item B<--with-cert>
+When exporting to the PKCS#12 format, include the certificate too.
+
 =back
 
 =cut
@@ -1826,10 +1842,14 @@ function x509Key() {
 
     # generate DER file?
     local der="false"
+    # generate PKCS#12 file?
+    local pkcs12="false"
+    # include certificate in PKCS#12 file?
+    local withCert="false"
     # name of the key to return
     local kAlias
 
-    local TEMP=$(getopt -o h -l der \
+    local TEMP=$(getopt -o h -l der -l pkcs12 -l with-cert\
         -n x509Key -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509Key: can't parse options" >&2
@@ -1842,6 +1862,10 @@ function x509Key() {
         case "$1" in
             --der) der="true"; shift 1
                 ;;
+            --pkcs12) pkcs12="true"; shift 1
+                ;;
+            --with-cert) withCert="true"; shift 1
+                ;;
             --) shift 1
                 break
                 ;;
@@ -1849,6 +1873,11 @@ function x509Key() {
     done
 
     kAlias="$1"
+
+    if [[ $der == "true" ]] && [[ $pkcs12 == "true" ]]; then
+        echo "Can't export PKCS#12 and DER together" >&2
+        return 1
+    fi
 
     if [[ $der == "true" ]]; then
         if [[ ! -e $kAlias/$x509DERKEY ]]; then
@@ -1870,6 +1899,26 @@ function x509Key() {
             fi
         fi
         echo "$kAlias/$x509DERKEY"
+    elif [[ $pkcs12 == "true" ]]; then
+        if [[ ! -e $kAlias/$x509PKCS12 ]]; then
+            local -a options
+            options=(-export -out "$kAlias/$x509PKCS12" -passout pass:
+                     -inkey "$kAlias/$x509PKEY" -name "$kAlias"
+                     -keypbe AES-256-CBC -macalg SHA1)
+            if [[ $withCert == "true" ]]; then
+                options=("${options[@]}" -in "$kAlias/$x509CERT"
+                         -caname "$kAlias" -certpbe NONE)
+            else
+                options=("${options[@]}" -nocerts)
+            fi
+            echo "Running openssl pkcs12 ${options[@]}"
+            openssl pkcs12 ${options[@]}
+            if [[ $? -ne 0 ]]; then
+                echo "Key export failed" >&2
+                return 1
+            fi
+        fi
+        echo "$kAlias/$x509PKCS12"
     else
         echo "$kAlias/$x509PKEY"
     fi
