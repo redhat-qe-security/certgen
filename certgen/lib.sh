@@ -1903,15 +1903,22 @@ function x509Key() {
         if [[ ! -e $kAlias/$x509PKCS12 ]]; then
             local -a options
             options=(-export -out "$kAlias/$x509PKCS12" -passout pass:
-                     -inkey "$kAlias/$x509PKEY" -name "$kAlias"
-                     -keypbe AES-256-CBC -macalg SHA1)
+                     -inkey "$kAlias/$x509PKEY" -name "$kAlias")
+            # NSS doesn't support MACs other than MD5 and SHA1,
+            # see RHBZ#1220573
+            # old OpenSSL doesn't support setting MAC at all
+            if openssl version | grep -q '0[.]9[.].'; then
+                options=(${options[@]} -keypbe PBE-SHA1-3DES)
+            else
+                options=(${options[@]} -keypbe AES-256-CBC -macalg SHA1)
+            fi
+
             if [[ $withCert == "true" ]]; then
                 options=("${options[@]}" -in "$kAlias/$x509CERT"
                          -caname "$kAlias" -certpbe NONE)
             else
                 options=("${options[@]}" -nocerts)
             fi
-            echo "Running openssl pkcs12 ${options[@]}"
             openssl pkcs12 ${options[@]}
             if [[ $? -ne 0 ]]; then
                 echo "Key export failed" >&2
@@ -2026,12 +2033,20 @@ function x509Cert() {
         echo "$kAlias/$x509DERCERT"
     elif [[ $pkcs12 == "true" ]]; then
         if [[ ! -e $kAlias/$x509PKCS12 ]]; then
+            local -a options
+            options=(-export -out "$kAlias/$x509PKCS12"
+                     -in "$kAlias/$x509CERT" -caname "$kAlias"
+                     -nokeys -passout "pass:$password"
+                     -certpbe NONE)
             # note that NSS doesn't support MACs other that MD5 and SHA1
             # see RHBZ#1220573
-            openssl pkcs12 -export -out "$kAlias/$x509PKCS12" \
-                -in "$kAlias/$x509CERT" -caname "$kAlias" \
-                -nokeys -passout "pass:$password" \
-                -certpbe NONE -macalg SHA1
+            # older version of openssl don't support setting MAC at all
+            if openssl version | grep -q '0[.]9[.].'; then
+                :
+            else
+                options=(${options[@]} -macalg SHA1)
+            fi
+            openssl pkcs12 "${options[@]}"
             if [ $? -ne 0 ]; then
                 echo "File conversion failed" >&2
                 return 1

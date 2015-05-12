@@ -124,6 +124,9 @@ rlJournalStart
         rlAssertGrep "BEGIN CERTIFICATE" "$rlRun_LOG"
         rlRun "rm $rlRun_LOG"
 
+        rlLogInfo "Check invalid option handling"
+        rlRun "x509Key --der --pkcs12 server" 1
+
         rlRun "x509RmAlias ca"
         rlRun "x509RmAlias server"
     rlPhaseEnd
