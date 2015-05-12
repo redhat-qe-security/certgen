@@ -1824,10 +1824,10 @@ DER encoded file (binary, not base64).
 
 Convert a copy of the private key to PKCS#12 format and output the location
 of PKCS#12 encoded file. The key will be encrypted with null password and
-PKCS#5 v2 PBE/PBKDF and AES-256-CBC cipher. Its friendly name will be set to
-alias.
+PKCS#5 v2 PBE/PBKDF and DES-EDE3-CBC cipher (strongest supported by NSS).
+Its friendly name will be set to alias.
 
-Note that the export does cache the last exported file, so if exported the
+Note that the export does cache the last exported file, so if you exported the
 key or certificate to PKCS#12 format before, you will have to `rm` the previous
 file first.
 
@@ -1904,13 +1904,13 @@ function x509Key() {
             local -a options
             options=(-export -out "$kAlias/$x509PKCS12" -passout pass:
                      -inkey "$kAlias/$x509PKEY" -name "$kAlias")
-            # NSS doesn't support MACs other than MD5 and SHA1,
-            # see RHBZ#1220573
+            # NSS doesn't support MACs other than MD5 and SHA1, or encryption
+            # stronger than 3DES, see RHBZ#1220573
             # old OpenSSL doesn't support setting MAC at all
             if openssl version | grep -q '0[.]9[.].'; then
                 options=(${options[@]} -keypbe PBE-SHA1-3DES)
             else
-                options=(${options[@]} -keypbe AES-256-CBC -macalg SHA1)
+                options=(${options[@]} -keypbe DES-EDE3-CBC -macalg SHA1)
             fi
 
             if [[ $withCert == "true" ]]; then
