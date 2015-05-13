@@ -204,11 +204,11 @@ rlJournalStart
         rlAssertGrep "TLS Web Server Authentication" "$rlRun_LOG"
         rlRun "rm '$rlRun_LOG'"
         options=('-CAfile' "$(x509Cert ca)"
-            '-untrusted' "$(x509Cert subca)"
-            "$(x509Cert server)")
+            '-untrusted' "$(x509Cert subca)")
         if ! rlIsRHEL 4; then
             options=(${options[@]} '-x509_strict')
         fi
+        options=(${options[@]} "$(x509Cert server)")
         rlRun -s "openssl verify ${options[*]}"
         rlAssertGrep "OK" "$rlRun_LOG"
         rlRun "rm '$rlRun_LOG'"
