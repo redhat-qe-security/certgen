@@ -49,11 +49,10 @@ rlJournalStart
         rlAssertExists "server"
         rlAssertExists "server/$x509PKEY"
         rlAssertExists "server/$x509CERT"
-        rlRun -s "x509DumpCert ca"
+
         rlLogInfo "Checking default settings for CA"
-        # check default subject name
+        rlRun -s "x509DumpCert ca"
         rlAssertGrep "Example CA" "$rlRun_LOG"
-        # check extensions
         rlAssertGrep "Subject Key Identifier" "$rlRun_LOG"
         rlAssertGrep "Authority Key Identifier" "$rlRun_LOG"
         rlAssertGrep "Key Usage:.*critical" "$rlRun_LOG"
@@ -63,8 +62,9 @@ rlJournalStart
         rlAssertGrep "CA:TRUE" "$rlRun_LOG"
         rlAssertNotGrep "Subject Alternative Name" "$rlRun_LOG"
         rlRun "rm '$rlRun_LOG'"
-        rlRun -s "x509DumpCert server"
+
         rlLogInfo "Checking default settings for server certificates"
+        rlRun -s "x509DumpCert server"
         rlAssertGrep "Example CA" "$rlRun_LOG"
         rlAssertGrep "localhost" "$rlRun_LOG"
         rlAssertGrep "Key Usage:.*critical" "$rlRun_LOG"
@@ -78,6 +78,7 @@ rlJournalStart
         rlAssertNotGrep "Subject Alternative Name" "$rlRun_LOG"
         rlAssertNotGrep "Basic Constraints" "$rlRun_LOG"
         rlRun "rm '$rlRun_LOG'"
+
         rlLogInfo "Checking key and certificate export"
         rlAssertExists "$(x509Key server)"
         rlAssertExists "$(x509Cert server)"
@@ -85,15 +86,21 @@ rlJournalStart
         rlAssertExists "$(x509Cert --der server)"
         rlRun "x509Cert --pkcs12 server" 0 "export to PKCS#12 format"
         rlAssertExists "$(x509Cert --pkcs12 server)"
-        rlRyn "grep localhost $(x509Cert --pkcs12 server)" 0 "Check if file is unencrypted"
+        if ! rlIsRHEL 4; then
+            rlRun "grep localhost $(x509Cert --pkcs12 server)" 0 "Check if file is unencrypted"
+        fi
+
         rlLogInfo "Checking if exported keys and certs match independent of format"
-        rlAssertNotEquals "PEM and DER key files should have different names" "$(x509Key server)" "$(x509Key --der server)"
-        rlAssertNotEquals "PEM and DER cert files should have different names" "$(x509Cert server)" "$(x509Cert --der server)"
+        rlAssertNotEquals "PEM and DER key files should have different names" \
+            "$(x509Key server)" "$(x509Key --der server)"
+        rlAssertNotEquals "PEM and DER cert files should have different names" \
+            "$(x509Cert server)" "$(x509Cert --der server)"
         rlAssertDiffer "$(x509Key server)" "$(x509Key --der server)"
         rlAssertDiffer "$(x509Cert server)" "$(x509Cert --der server)"
         a=$(openssl rsa -modulus -in $(x509Key server) -noout)
         b=$(openssl rsa -modulus -in $(x509Key server --der) -inform DER -noout)
         rlRun "[[ '$a' == '$b' ]]" 0 "Check if files have the same private key inside"
+
         rlLogInfo "Clean up for phase"
         rlRun "x509RmAlias ca"
         rlRun "x509RmAlias server"
@@ -106,14 +113,18 @@ rlJournalStart
         rlRun "x509CertSign --CA ca server"
 
         rlLogInfo "Test export of just the key"
-        rlRun "x509Key --pkcs12 server"
-        rlAssertExists "$(x509Key --pkcs12 server)"
-        rlRun -s "openssl pkcs12 -in $(x509Key --pkcs12 server) -info -passin pass: -nodes"
-        rlAssertGrep "server" "$rlRun_LOG"
-        rlAssertGrep "BEGIN.*KEY" "$rlRun_LOG" -E
-        rlAssertNotGrep "BEGIN CERTIFICATE" "$rlRun_LOG"
-        rlRun "rm $rlRun_LOG"
-        rlRun "rm $(x509Key --pkcs12 server)"
+        if rlIsRHEL 4; then
+            rlRun "x509Key --pkcs12 server" 1
+        else
+            rlRun "x509Key --pkcs12 server"
+            rlAssertExists "$(x509Key --pkcs12 server)"
+            rlRun -s "openssl pkcs12 -in $(x509Key --pkcs12 server) -info -passin pass: -nodes"
+            rlAssertGrep "server" "$rlRun_LOG"
+            rlAssertGrep "BEGIN.*KEY" "$rlRun_LOG" -E
+            rlAssertNotGrep "BEGIN CERTIFICATE" "$rlRun_LOG"
+            rlRun "rm $rlRun_LOG"
+            rlRun "rm $(x509Key --pkcs12 server)"
+        fi
 
         rlLogInfo "Test export of key with certificate"
         rlRun "x509Key --pkcs12 --with-cert server"
@@ -161,7 +172,7 @@ rlJournalStart
         rlRun -s "x509DumpCert server"
         rlAssertGrep "dsaEncryption" "$rlRun_LOG"
         # DSA with SHA256 is unsupported with old OpenSSL (<1.0.0)
-        if rlIsRHEL 5; then
+        if rlIsRHEL 4 5; then
             rlAssertGrep "dsaWithSHA1" "$rlRun_LOG"
         else
             rlAssertGrep "dsa_with_SHA256" "$rlRun_LOG"
@@ -194,8 +205,10 @@ rlJournalStart
         rlRun "rm '$rlRun_LOG'"
         options=('-CAfile' "$(x509Cert ca)"
             '-untrusted' "$(x509Cert subca)"
-            '-x509_strict'
             "$(x509Cert server)")
+        if ! rlIsRHEL 4; then
+            options=(${options[@]} '-x509_strict')
+        fi
         rlRun -s "openssl verify ${options[*]}"
         rlAssertGrep "OK" "$rlRun_LOG"
         rlRun "rm '$rlRun_LOG'"
@@ -216,15 +229,19 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStartTest "Hash for signing"
+        hash="sha512"
+        if rlIsRHEL 4; then
+            hash="md5"
+        fi
         rlRun "x509KeyGen ca"
-        rlRun "x509SelfSign --md sha512 ca"
+        rlRun "x509SelfSign --md $hash ca"
         rlRun "x509KeyGen server"
-        rlRun "x509CertSign --CA ca --md sha512 server"
+        rlRun "x509CertSign --CA ca --md $hash server"
         rlRun -s "x509DumpCert ca"
-        rlAssertGrep "sha512" "$rlRun_LOG"
+        rlAssertGrep "$hash" "$rlRun_LOG"
         rlRun "rm $rlRun_LOG"
         rlRun -s "x509DumpCert server"
-        rlAssertGrep "sha512" "$rlRun_LOG"
+        rlAssertGrep "$hash" "$rlRun_LOG"
         rlRun "rm $rlRun_LOG"
         rlRun "x509RmAlias ca"
         rlRun "x509RmAlias server"
@@ -291,15 +308,19 @@ rlJournalStart
             '--subjectAltName' 'DNS.1=example.com'
             '--subjectAltName' 'DNS.2=localhost'
             '--subjectAltName' 'IP.1=192.168.0.1'
-            '--subjectAltName' 'IP.2=::1'
             )
+        if ! rlIsRHEL 4; then
+            options=(${options[@]} '--subjectAltName' 'IP.2=::1')
+        fi
         rlRun "x509CertSign --CA ca --DN 'O=Test' ${options[*]} server"
         rlRun -s "x509DumpCert server"
         rlAssertGrep "Subject Alternative Name.*critical" "$rlRun_LOG"
         rlAssertGrep "example[.]com" "$rlRun_LOG"
         rlAssertGrep "localhost" "$rlRun_LOG"
         rlAssertGrep "192[.]168[.]0[.]1" "$rlRun_LOG"
-        rlAssertGrep "0:0:0:0:0:0:0:1" "$rlRun_LOG"
+        if ! rlIsRHEL 4; then
+            rlAssertGrep "0:0:0:0:0:0:0:1" "$rlRun_LOG"
+        fi
         rlRun "rm $rlRun_LOG"
         rlRun "x509RmAlias ca"
         rlRun "x509RmAlias server"

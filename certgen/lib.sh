@@ -158,7 +158,11 @@ __INTERNAL_x509GenConfig() {
     # variable that has the DN broken up by items, most significant first
     declare -a dn
     # hash used to sign the certificate
-    local md="sha256"
+    if openssl version | grep -q '0[.]9[.]7'; then
+        local md="sha1"
+    else
+        local md="sha256"
+    fi
     # current time in seconds from UNIX epoch
     local now=$(date '+%s')
     # date before which the certificate is not valid
@@ -683,7 +687,8 @@ Note that some combinations of key types and digest algorithms are unsupported.
 For example, you can't sign using ECDSA and MD5.
 
 SHA256 by default, will be updated to weakeast hash recommended by NIST or
-generally thought to be secure.
+generally thought to be secure. SHA1 in case the openssl version installed
+doesn't support SHA256.
 
 =item B<--noAuthKeyId>
 
@@ -1915,8 +1920,20 @@ function x509Key() {
 
             if [[ $withCert == "true" ]]; then
                 options=("${options[@]}" -in "$kAlias/$x509CERT"
-                         -caname "$kAlias" -certpbe NONE)
+                         -caname "$kAlias")
+
+                # old OpenSSL versions don't support no encryption on certs
+                # use the weakest suppported by current (2015) FIPS
+                if openssl version | grep -q '0[.]9[.]7'; then
+                    options=(${options[@]} -certpbe PBE-SHA1-3DES)
+                else
+                    options=(${options[@]} -certpbe NONE)
+                fi
             else
+                if openssl version | grep -q '0[.]9[.]7'; then
+                    echo "Export without certificate unsupported with this version of OpenSSL, try --with-cert" >&2
+                    return 1
+                fi
                 options=("${options[@]}" -nocerts)
             fi
             openssl pkcs12 ${options[@]}
@@ -2036,8 +2053,16 @@ function x509Cert() {
             local -a options
             options=(-export -out "$kAlias/$x509PKCS12"
                      -in "$kAlias/$x509CERT" -caname "$kAlias"
-                     -nokeys -passout "pass:$password"
-                     -certpbe NONE)
+                     -nokeys -passout "pass:$password")
+
+            # Old OpenSSL versions don't support lack of encryption on
+            # certificate, use the weakest supported by current (2015) FIPS
+            if openssl version | grep -q '0[.]9[.]7'; then
+                options=(${options[@]} -certpbe PBE-SHA1-3DES)
+            else
+                options=(${options[@]} -certpbe NONE)
+            fi
+
             # note that NSS doesn't support MACs other that MD5 and SHA1
             # see RHBZ#1220573
             # older version of openssl don't support setting MAC at all
@@ -2046,10 +2071,17 @@ function x509Cert() {
             else
                 options=(${options[@]} -macalg SHA1)
             fi
+
+            local ret
             openssl pkcs12 "${options[@]}"
-            if [ $? -ne 0 ]; then
-                echo "File conversion failed" >&2
-                return 1
+            ret=$?
+
+            # old openssl has broken return codes...
+            if ! openssl version | grep -q '0[.]9[.]7'; then
+                if [ $ret -ne 0 ]; then
+                    echo "File conversion failed" >&2
+                    return 1
+                fi
             fi
         fi
         echo "$kAlias/$x509PKCS12"
