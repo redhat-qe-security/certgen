@@ -1805,7 +1805,8 @@ I<alias>
 =back
 
 The function returns on standard output the relative path of the file
-that contains the PAM formatted, unencrypted private key file.
+that contains the PEM formatted (SSLeay or PKCS#8), unencrypted
+private key file.
 
 To be used for simple variable substitution on command line, e.g.:
 
@@ -1965,7 +1966,7 @@ I<alias>
 =back
 
 The function returns on standard output the relative path of the file
-that contains the PAM formatted X.509 certificate associated with provided
+that contains the PEM formatted X.509 certificate associated with provided
 alias.
 
 To be used for simple variable substitution on command line, e.g.:
