@@ -182,6 +182,16 @@ rlJournalStart
         rlRun "x509RmAlias server"
     rlPhaseEnd
 
+    rlPhaseStartTest "DSA param reuse"
+        rlRun "x509KeyGen -t dsa ca"
+        rlRun "x509KeyGen -t dsa --params ca server"
+        a=$(openssl dsa -in $(x509Key ca) -noout -text | grep -A 100 '^P:')
+        b=$(openssl dsa -in $(x509Key server) -noout -text | grep -A 100 '^P:')
+        rlRun "[[ '$a' == '$b' ]]" 0 "Check if parameters are the same"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
     rlPhaseStartTest "Certificate profiles"
         rlRun "x509KeyGen ca"
         rlRun "x509KeyGen subca"

@@ -413,6 +413,7 @@ By default it generates RSA key of the smallest size aceptable in FIPS mode
 B<x509KeyGen>
 [B<-t> I<type>]
 [B<-s> I<size>]
+[B<--params> I<alias>]
 I<alias>
 
 =back
@@ -439,6 +440,11 @@ Other valid names for ECDSA curves can be acquired by running
 
     openssl ecparam -list_curves
 
+=item B<--params> I<alias>
+
+Reuse DSA parameters from another certificate (usually the CA that will later
+sign the certificate).
+
 =item I<alias>
 
 Name of directory in which the generated key pair will be placed.
@@ -460,12 +466,14 @@ x509KeyGen() {
     local kSize=""
     # name of key to generate
     local kAlias
+    # name of key alias with parameters to reuse
+    local paramAlias=""
 
     #
     # parse options
     #
 
-    local TEMP=$(getopt -o t:s: -n x509KeyGen -- "$@")
+    local TEMP=$(getopt -o t:s: -l params:  -n x509KeyGen -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509KeyGen: can't parse options" >&2
         return 1
@@ -478,6 +486,8 @@ x509KeyGen() {
             -t) kType="$2"; shift 2
                 ;;
             -s) kSize="$2"; shift 2
+                ;;
+            --params) paramAlias="$2"; shift 2
                 ;;
             --) shift 1
                 break
@@ -533,15 +543,23 @@ x509KeyGen() {
             return 1
         fi
     elif [[ $kType == "DSA" ]]; then
-        openssl dsaparam "$kSize" -out "$kAlias/dsa_params.pem"
-        if [ $? -ne 0 ]; then
-            echo "x509KeyGen: Parameter generation failed" >&2
-            return 1
-        fi
-        openssl gendsa -out "$kAlias/$x509PKEY" "$kAlias/dsa_params.pem"
-        if [ $? -ne 0 ]; then
-            echo "x509KeyGen: Key generation failed" >&2
-            return 1
+        if [[ -z $paramAlias ]]; then
+            openssl dsaparam "$kSize" -out "$kAlias/dsa_params.pem"
+            if [ $? -ne 0 ]; then
+                echo "x509KeyGen: Parameter generation failed" >&2
+                return 1
+            fi
+            openssl gendsa -out "$kAlias/$x509PKEY" "$kAlias/dsa_params.pem"
+            if [ $? -ne 0 ]; then
+                echo "x509KeyGen: Key generation failed" >&2
+                return 1
+            fi
+        else
+            openssl gendsa -out "$kAlias/$x509PKEY" "$paramAlias/dsa_params.pem"
+            if [ $? -ne 0 ]; then
+                echo "x509KeyGen: Key generation failed" >&2
+                return 1
+            fi
         fi
     else # RSA
         openssl genrsa -out "$kAlias/$x509PKEY" "$kSize"
