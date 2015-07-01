@@ -192,6 +192,19 @@ rlJournalStart
         rlRun "x509RmAlias server"
     rlPhaseEnd
 
+    rlPhaseStartTest "DSA conservative values"
+        rlRun "x509KeyGen -t dsa --conservative -s 1024 ca"
+        rlRun "openssl dsa -in $(x509Key ca) -noout -text | grep -A1 'P:' | \
+               tail -n 1 | grep ' 00:'"
+        rlRun "openssl dsa -in $(x509Key ca) -noout -text | grep -A1 'G:' | \
+               tail -n 1 | grep ' 00:'"
+        rlRun "openssl dsa -in $(x509Key ca) -noout -text | grep -A1 'Q:' | \
+               tail -n 1 | grep ' 00:'"
+        rlRun "openssl dsa -in $(x509Key ca) -noout -text | grep -A1 'pub:' | \
+               tail -n 1 | grep ' 00:'"
+        rlRun "x509RmAlias ca"
+    rlPhaseEnd
+
     rlPhaseStartTest "Certificate profiles"
         rlRun "x509KeyGen ca"
         rlRun "x509KeyGen subca"

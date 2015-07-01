@@ -414,6 +414,7 @@ B<x509KeyGen>
 [B<-t> I<type>]
 [B<-s> I<size>]
 [B<--params> I<alias>]
+[B<--conservative>]
 I<alias>
 
 =back
@@ -445,6 +446,19 @@ Other valid names for ECDSA curves can be acquired by running
 Reuse DSA parameters from another certificate (usually the CA that will later
 sign the certificate).
 
+=item B<--conservative>
+
+Because some implementations incorrectly infer the strength of DSA keys from
+the public key value instead of the prime P, they will fail to process
+parameters of size smaller than the 1024, 2048 or 3072 bit defined in the
+standard.
+
+With this option both the PQG parameters and the public key value will be
+regenerated until the most significant bit for all of the 4 values is set.
+
+Note that this is just a workaround for RHBZ#1238279 and RHBZ#1238290, and
+should not be used by default.
+
 =item I<alias>
 
 Name of directory in which the generated key pair will be placed.
@@ -468,12 +482,16 @@ x509KeyGen() {
     local kAlias
     # name of key alias with parameters to reuse
     local paramAlias=""
+    # name of file with DSA parameters
+    local dsaParams=""
+    # whether to gen "safer" parameters
+    local conservative="False"
 
     #
     # parse options
     #
 
-    local TEMP=$(getopt -o t:s: -l params:  -n x509KeyGen -- "$@")
+    local TEMP=$(getopt -o t:s: -l params: -l conservative -n x509KeyGen -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509KeyGen: can't parse options" >&2
         return 1
@@ -488,6 +506,8 @@ x509KeyGen() {
             -s) kSize="$2"; shift 2
                 ;;
             --params) paramAlias="$2"; shift 2
+                ;;
+            --conservative) conservative="True"; shift 1
                 ;;
             --) shift 1
                 break
@@ -544,23 +564,39 @@ x509KeyGen() {
         fi
     elif [[ $kType == "DSA" ]]; then
         if [[ -z $paramAlias ]]; then
-            openssl dsaparam "$kSize" -out "$kAlias/dsa_params.pem"
-            if [ $? -ne 0 ]; then
-                echo "x509KeyGen: Parameter generation failed" >&2
-                return 1
-            fi
-            openssl gendsa -out "$kAlias/$x509PKEY" "$kAlias/dsa_params.pem"
-            if [ $? -ne 0 ]; then
-                echo "x509KeyGen: Key generation failed" >&2
-                return 1
-            fi
+            while true; do
+                openssl dsaparam "$kSize" -out "$kAlias/dsa_params.pem"
+                if [ $? -ne 0 ]; then
+                    echo "x509KeyGen: Parameter generation failed" >&2
+                    return 1
+                fi
+                if [[ $conservative == "False" ]]; then
+                    break
+                fi
+                if openssl dsaparam -noout -text -in "$kAlias/dsa_params.pem" | \
+                    grep -iA1 ' G:' | tail -n 1 | grep -qE '[\s]*00:'; then
+                    break
+                fi
+            done
+            dsaParams="$kAlias/dsa_params.pem"
         else
-            openssl gendsa -out "$kAlias/$x509PKEY" "$paramAlias/dsa_params.pem"
+            dsaParams="$paramAlias/dsa_params.pem"
+        fi
+
+        while true; do
+            openssl gendsa -out "$kAlias/$x509PKEY" "$dsaParams"
             if [ $? -ne 0 ]; then
                 echo "x509KeyGen: Key generation failed" >&2
                 return 1
             fi
-        fi
+            if [[ $conservative == "False" ]]; then
+                break
+            fi
+            if openssl dsa -noout -text -in "$kAlias/$x509PKEY" | \
+                grep -A1 'pub:' | tail -n 1 | grep -E '[\s]*00:'; then
+                break
+            fi
+        done
     else # RSA
         openssl genrsa -out "$kAlias/$x509PKEY" "$kSize"
         if [ $? -ne 0 ]; then
