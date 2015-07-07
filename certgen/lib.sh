@@ -565,6 +565,7 @@ x509KeyGen() {
     elif [[ $kType == "DSA" ]]; then
         if [[ -z $paramAlias ]]; then
             while true; do
+                rm -f "$kAlias/dsa_params.pem"
                 openssl dsaparam "$kSize" -out "$kAlias/dsa_params.pem"
                 if [ $? -ne 0 ]; then
                     echo "x509KeyGen: Parameter generation failed" >&2
@@ -574,7 +575,7 @@ x509KeyGen() {
                     break
                 fi
                 if openssl dsaparam -noout -text -in "$kAlias/dsa_params.pem" | \
-                    grep -iA1 ' G:' | tail -n 1 | grep -qE '[\s]*00:'; then
+                    grep -iA1 'G:' | tail -n 1 | grep -E '^[[:space:]]*00:'; then
                     break
                 fi
             done
@@ -593,7 +594,7 @@ x509KeyGen() {
                 break
             fi
             if openssl dsa -noout -text -in "$kAlias/$x509PKEY" | \
-                grep -A1 'pub:' | tail -n 1 | grep -E '[\s]*00:'; then
+                grep -A1 'pub:' | tail -n 1 | grep -E '^[[:space:]]*00:'; then
                 break
             fi
         done

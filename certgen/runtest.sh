@@ -194,6 +194,7 @@ rlJournalStart
 
     rlPhaseStartTest "DSA conservative values"
         rlRun "x509KeyGen -t dsa --conservative -s 1024 ca"
+        rlRun "openssl dsa -in $(x509Key ca) -noout -text" 0,1 "Dump the key"
         rlRun "openssl dsa -in $(x509Key ca) -noout -text | grep -A1 'P:' | \
                tail -n 1 | grep ' 00:'"
         rlRun "openssl dsa -in $(x509Key ca) -noout -text | grep -A1 'G:' | \
