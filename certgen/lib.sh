@@ -415,6 +415,7 @@ B<x509KeyGen>
 [B<-s> I<size>]
 [B<--params> I<alias>]
 [B<--conservative>]
+[B<--anti-conservative]
 I<alias>
 
 =back
@@ -459,6 +460,14 @@ regenerated until the most significant bit for all of the 4 values is set.
 Note that this is just a workaround for RHBZ#1238279 and RHBZ#1238290, and
 should not be used by default.
 
+=item B<--anti-conservative>
+
+Generate a set of parameters that will fail if the implementation checks the
+size of PQG DSA parameters incorrecty - the G parameter won't have its MSB set.
+
+This is sort-of reverse of --conservative, the default behaviour is to generate
+a set of paramters randomly.
+
 =item I<alias>
 
 Name of directory in which the generated key pair will be placed.
@@ -486,12 +495,15 @@ x509KeyGen() {
     local dsaParams=""
     # whether to gen "safer" parameters
     local conservative="False"
+    # whether to gen unsafe paramters that are known to break interoperability
+    local incompatible="False"
 
     #
     # parse options
     #
 
-    local TEMP=$(getopt -o t:s: -l params: -l conservative -n x509KeyGen -- "$@")
+    local TEMP=$(getopt -o t:s: -l params: -l conservative -l anti-conservative \
+                 -n x509KeyGen -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509KeyGen: can't parse options" >&2
         return 1
@@ -508,6 +520,8 @@ x509KeyGen() {
             --params) paramAlias="$2"; shift 2
                 ;;
             --conservative) conservative="True"; shift 1
+                ;;
+            --anti-conservative) incompatible="True"; shift 1
                 ;;
             --) shift 1
                 break
@@ -545,6 +559,11 @@ x509KeyGen() {
         fi
     fi
 
+    if [[ $conservative == "True" && $incompatible == "True" ]]; then
+        echo "x509KeyGen: can't do conservative and anti-conservative at once" >&2
+        return 1
+    fi
+
     if [[ -z $kAlias ]]; then
         echo "x509KeyGen: No certificate alias specified" >&2
         return 1
@@ -571,11 +590,17 @@ x509KeyGen() {
                     echo "x509KeyGen: Parameter generation failed" >&2
                     return 1
                 fi
-                if [[ $conservative == "False" ]]; then
+                if [[ $conservative == "False" && $incompatible == "False" ]]; then
                     break
                 fi
-                if openssl dsaparam -noout -text -in "$kAlias/dsa_params.pem" | \
+                if [[ $conservative == "True" ]] &&
+                    openssl dsaparam -noout -text -in "$kAlias/dsa_params.pem" | \
                     grep -iA1 'G:' | tail -n 1 | grep -E '^[[:space:]]*00:'; then
+                    break
+                fi
+                if [[ $incompatible == "True" ]] &&
+                    openssl dsaparam -noout -text -in "$kAlias/dsa_params.pem" |\
+                    grep -iA1 'G:' | tail -n 1 | grep -E '^[[:space:]]*[1-3]'; then
                     break
                 fi
             done
@@ -590,11 +615,17 @@ x509KeyGen() {
                 echo "x509KeyGen: Key generation failed" >&2
                 return 1
             fi
-            if [[ $conservative == "False" ]]; then
+            if [[ $conservative == "False" && $incompatible == "False" ]]; then
                 break
             fi
-            if openssl dsa -noout -text -in "$kAlias/$x509PKEY" | \
+            if [[ $conservative == "True" ]] &&
+                openssl dsa -noout -text -in "$kAlias/$x509PKEY" | \
                 grep -A1 'pub:' | tail -n 1 | grep -E '^[[:space:]]*00:'; then
+                break
+            fi
+            if [[ $incompatible == "True" ]] &&
+                openssl dsa -noout -text -in "$kAlias/$x509PKEY" | \
+                grep -A1 'pub:' | tail -n 1 | grep -E '^[[:space:]]*[1-3]'; then
                 break
             fi
         done
