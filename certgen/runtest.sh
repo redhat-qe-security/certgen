@@ -192,6 +192,8 @@ rlJournalStart
         rlRun "x509RmAlias server"
     rlPhaseEnd
 
+    # don't run in strict FIPS mode
+    if [ ! $OPENSSL_ENFORCE_MODULUS_BITS ]; then
     rlPhaseStartTest "DSA conservative values"
         rlRun "x509KeyGen -t dsa --conservative -s 1024 ca"
         rlRun "openssl dsa -in $(x509Key ca) -noout -text" 0,1 "Dump the key"
@@ -219,6 +221,7 @@ rlJournalStart
                tail -n 1 | grep -v ' 00:'"
         rlRun "x509RmAlias ca"
     rlPhaseEnd
+    fi
 
     rlPhaseStartTest "Certificate profiles"
         rlRun "x509KeyGen ca"
