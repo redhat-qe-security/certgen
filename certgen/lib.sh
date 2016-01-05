@@ -116,6 +116,16 @@ For RHEL5 it should be set to C<+%y%m%d%H%M%SZ>.
 
 Defaults to version supported by locally installed OpenSSL
 
+=item B<x509PKCS8KEY>
+Name of the file where private keys in PKCS#8 format will be placed.
+F<pkcs8.pem> by default. Note that those files are generated on demand
+only by B<x509Key> function.
+
+=item B<x509PKCS8DERKEY>
+Name of the file where private keys in PKCS#8 DER format will be placed.
+F<pkcs8.key> by default. Note that those files are generated on demand only
+by B<x509Key> function.
+
 =item B<x509PKCS12>
 
 Name of the file where certificates and keys in PKCS#12 format will be placed.
@@ -137,6 +147,8 @@ x509PKEY=${x509PKEY:-key.pem}
 x509DERKEY=${x509DERKEY:-key.key}
 x509CERT=${x509CERT:-cert.pem}
 x509DERCERT=${x509DERCERT:-cert.crt}
+x509PKCS8KEY=${x509PKCS8KEY:-pkcs8.pem}
+x509PKCS8DERKEY=${x509PKCS8DERKEY:-pkcs8.key}
 x509PKCS12=${x509PKCS12:-bundle.p12}
 x509CSR=${x509CSR:-request.csr}
 x509CACNF=${x509CACNF:-ca.cnf}
@@ -1887,6 +1899,7 @@ I<alias>
 [B<--der>]
 [B<--pkcs12>]
 [B<--with-cert>]
+[B<--pkcs8>]
 
 =back
 
@@ -1926,6 +1939,15 @@ file first.
 =item B<--with-cert>
 When exporting to the PKCS#12 format, include the certificate too.
 
+=item B<--pkcs8>
+
+Convert a copy of the private key to PKCS#8 format and output the location
+of PKCS#8 encoded file. Can be combined with B<--der>.
+
+Note that the export does cache the last exported file, so if you exported the
+key or certificate to PKCS#8 format before, you will have to `rm` the previous
+file first.
+
 =back
 
 =cut
@@ -1936,12 +1958,14 @@ function x509Key() {
     local der="false"
     # generate PKCS#12 file?
     local pkcs12="false"
+    # generate PKCS#8 file?
+    local pkcs8="false"
     # include certificate in PKCS#12 file?
     local withCert="false"
     # name of the key to return
     local kAlias
 
-    local TEMP=$(getopt -o h -l der -l pkcs12 -l with-cert\
+    local TEMP=$(getopt -o h -l der -l pkcs12 -l with-cert -l pkcs8\
         -n x509Key -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509Key: can't parse options" >&2
@@ -1958,6 +1982,8 @@ function x509Key() {
                 ;;
             --with-cert) withCert="true"; shift 1
                 ;;
+            --pkcs8) pkcs8="true"; shift 1
+                ;;
             --) shift 1
                 break
                 ;;
@@ -1971,26 +1997,39 @@ function x509Key() {
         return 1
     fi
 
-    if [[ $der == "true" ]]; then
-        if [[ ! -e $kAlias/$x509DERKEY ]]; then
-            # openssl 0.9.8 doesn't have pkey subcommand, simulate it with
-            # rsa and dsa subcommands, ec subcommand is not supported there
-            if openssl version | grep -q '0[.]9[.].'; then
-                if [[ -e "$kAlias/dsa_params.pem" ]]; then
-                    openssl dsa -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
-                elif grep -q 'BEGIN RSA PRIVATE KEY' "$kAlias/$x509PKEY" \
-                    || grep -q 'BEGIN PRIVATE KEY' "$kAlias/$x509PKEY"; then
-                    openssl rsa -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
-                else
-                    echo "Private key in unknown format" >&2
-                    return 1
-                fi
+    if [[ $pkcs12 == "true" ]] && [[ $pkcs8 == "true" ]]; then
+        echo "Can't export PKCS#12 and PKCS#8 together" >&2
+        return 1
+    fi
 
-            else
-                openssl pkey -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
+    if [[ $der == "true" ]]; then
+        if [[ $pkcs8 == "true" ]]; then
+            if [[ ! -e $kAlias/$x509PKCS8DERKEY ]]; then
+                openssl pkcs8 -topk8 -in "$kAlias/$x509PKEY" -nocrypt \
+                    -outform DER -out "$kAlias/$x509PKCS8DERKEY"
             fi
+            echo "$kAlias/$x509PKCS8DERKEY"
+        else
+            if [[ ! -e $kAlias/$x509DERKEY ]]; then
+                # openssl 0.9.8 doesn't have pkey subcommand, simulate it with
+                # rsa and dsa subcommands, ec subcommand is not supported there
+                if openssl version | grep -q '0[.]9[.].'; then
+                    if [[ -e "$kAlias/dsa_params.pem" ]]; then
+                        openssl dsa -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
+                    elif grep -q 'BEGIN RSA PRIVATE KEY' "$kAlias/$x509PKEY" \
+                        || grep -q 'BEGIN PRIVATE KEY' "$kAlias/$x509PKEY"; then
+                        openssl rsa -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
+                    else
+                        echo "Private key in unknown format" >&2
+                        return 1
+                    fi
+
+                else
+                    openssl pkey -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
+                fi
+            fi
+            echo "$kAlias/$x509DERKEY"
         fi
-        echo "$kAlias/$x509DERKEY"
     elif [[ $pkcs12 == "true" ]]; then
         if [[ ! -e $kAlias/$x509PKCS12 ]]; then
             local -a options
@@ -2030,6 +2069,12 @@ function x509Key() {
             fi
         fi
         echo "$kAlias/$x509PKCS12"
+    elif [[ $pkcs8 == "true" ]]; then
+        if [[ ! -e $kAlias/$x509PKCS8KEY ]]; then
+            openssl pkcs8 -topk8 -in "$kAlias/$x509PKEY" -nocrypt \
+                -out "$kAlias/$x509PKCS8KEY"
+        fi
+        echo "$kAlias/$x509PKCS8KEY"
     else
         echo "$kAlias/$x509PKEY"
     fi

@@ -223,6 +223,25 @@ rlJournalStart
     rlPhaseEnd
     fi
 
+    rlPhaseStartTest "PKCS8 key format"
+        algos="rsa dsa ecdsa"
+        if rlIsRHEL '<6.5'; then algos="rsa dsa"; fi
+        for algo in $algos; do
+            bits_or_curves="2048 3072"
+            if [[ $algo = "ecdsa" ]]; then
+                bits_or_curves="secp384r1 secp521r1 prime256v1"
+            fi
+            for bc in $bits_or_curves; do
+                x509KeyGen -t $algo -s $bc key
+                rlAssertGrep "-----BEGIN PRIVATE KEY-----" $(x509Key --pkcs8 key)
+                rlAssertGrep "-----END PRIVATE KEY-----" $(x509Key --pkcs8 key)
+                rlRun "openssl pkcs8 -topk8 -in $(x509Key key) -out pkcs8.key -nocrypt"
+                rlRun "diff -u $(x509Key --pkcs8 key) pkcs8.key"
+                rm -rf pkcs8.key key/
+            done
+        done
+    rlPhaseEnd
+
     rlPhaseStartTest "Certificate profiles"
         rlRun "x509KeyGen ca"
         rlRun "x509KeyGen subca"
