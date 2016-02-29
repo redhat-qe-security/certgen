@@ -229,7 +229,12 @@ rlJournalStart
         for algo in $algos; do
             bits_or_curves="2048 3072"
             if [[ $algo = "ecdsa" ]]; then
-                bits_or_curves="secp384r1 secp521r1 prime256v1"
+                # support for P-521 was added in RHEL-6.6.0
+                if rlIsRHEL '<6.6'; then
+                    bits_or_curves="secp384r1 prime256v1"
+                else
+                    bits_or_curves="secp384r1 secp521r1 prime256v1"
+                fi
             fi
             for bc in $bits_or_curves; do
                 x509KeyGen -t $algo -s $bc key
