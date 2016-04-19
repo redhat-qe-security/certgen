@@ -89,6 +89,9 @@ rlJournalStart
         if ! rlIsRHEL 4; then
             rlRun "grep localhost $(x509Cert --pkcs12 server)" 0 "Check if file is unencrypted"
         fi
+        rlRun "rm $(x509Cert --pkcs12 server)"
+        rlRun "x509Cert --pkcs12 --password RedHatEnterpriseLinux7.1 server"\
+            0 "Test export with encryption"
 
         rlLogInfo "Checking if exported keys and certs match independent of format"
         rlAssertNotEquals "PEM and DER key files should have different names" \
@@ -119,6 +122,14 @@ rlJournalStart
             rlRun "x509Key --pkcs12 server"
             rlAssertExists "$(x509Key --pkcs12 server)"
             rlRun -s "openssl pkcs12 -in $(x509Key --pkcs12 server) -info -passin pass: -nodes"
+            rlAssertGrep "server" "$rlRun_LOG"
+            rlAssertGrep "BEGIN.*KEY" "$rlRun_LOG" -E
+            rlAssertNotGrep "BEGIN CERTIFICATE" "$rlRun_LOG"
+            rlRun "rm $rlRun_LOG"
+            rlRun "rm $(x509Key --pkcs12 server)"
+            rlLogInfo "Test export with password"
+            rlRun "x509Key --pkcs12 --password RedHatEnterpriseLinux7.1 server"
+            rlRun -s "openssl pkcs12 -in $(x509Key --pkcs12 server) -info -passin pass:RedHatEnterpriseLinux7.1 -nodes"
             rlAssertGrep "server" "$rlRun_LOG"
             rlAssertGrep "BEGIN.*KEY" "$rlRun_LOG" -E
             rlAssertNotGrep "BEGIN CERTIFICATE" "$rlRun_LOG"

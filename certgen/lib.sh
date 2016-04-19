@@ -1939,6 +1939,10 @@ file first.
 =item B<--with-cert>
 When exporting to the PKCS#12 format, include the certificate too.
 
+=item B<--password> I<password>
+When exporting to the PKCS#12 format, use the I<password> as the password
+of the file. Uses empty string by default
+
 =item B<--pkcs8>
 
 Convert a copy of the private key to PKCS#8 format and output the location
@@ -1964,8 +1968,10 @@ function x509Key() {
     local withCert="false"
     # name of the key to return
     local kAlias
+    # password to use for PKCS#12 export
+    local password=''
 
-    local TEMP=$(getopt -o h -l der -l pkcs12 -l with-cert -l pkcs8\
+    local TEMP=$(getopt -o h -l der -l pkcs12 -l with-cert -l pkcs8,password:\
         -n x509Key -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509Key: can't parse options" >&2
@@ -1983,6 +1989,8 @@ function x509Key() {
             --with-cert) withCert="true"; shift 1
                 ;;
             --pkcs8) pkcs8="true"; shift 1
+                ;;
+            --password) password="$2"; shift 2
                 ;;
             --) shift 1
                 break
@@ -2033,7 +2041,8 @@ function x509Key() {
     elif [[ $pkcs12 == "true" ]]; then
         if [[ ! -e $kAlias/$x509PKCS12 ]]; then
             local -a options
-            options=(-export -out "$kAlias/$x509PKCS12" -passout pass:
+            options=(-export -out "$kAlias/$x509PKCS12"
+                     -passout "pass:$password"
                      -inkey "$kAlias/$x509PKEY" -name "$kAlias")
             # NSS doesn't support MACs other than MD5 and SHA1, or encryption
             # stronger than 3DES, see RHBZ#1220573
@@ -2128,6 +2137,10 @@ Convert a copy of the certificate to the PKCS#12 format and print on standard
 output the file name of the copy. Friendly name of the certificate in PKCS#12
 file is set to the alias.
 
+=item B<--password> I<password>
+When exporting to the PKCS#12 format, use the I<password> as the password
+of the file. Uses empty string by default
+
 =back
 
 =cut
@@ -2143,7 +2156,7 @@ function x509Cert() {
     # name of the key to return
     local kAlias
 
-    local TEMP=$(getopt -o h -l der -l pkcs12\
+    local TEMP=$(getopt -o h -l der -l pkcs12 -l password:\
         -n x509Cert -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509Cert: can't parse options" >&2
@@ -2157,6 +2170,8 @@ function x509Cert() {
             --der) der="true"; shift 1
                 ;;
             --pkcs12) pkcs12="true"; shift 1
+                ;;
+            --password) password="$2"; shift 2
                 ;;
             --) shift 1
                 break
