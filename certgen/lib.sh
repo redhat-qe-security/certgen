@@ -630,9 +630,18 @@ x509KeyGen() {
             if [[ $conservative == "False" && $incompatible == "False" ]]; then
                 break
             fi
+            local prime_chars
+            local pub_chars
+            prime_chars="$(openssl dsa -noout -text -in "$kAlias/$x509PKEY" | \
+                grep -iA 100 '^P:' | grep -iB 100 '^Q:' | wc -c)"
+            pub_chars="$(openssl dsa -noout -text -in "$kAlias/$x509PKEY" | \
+                grep -iA 100 'pub:' | grep -iB 100 '^P:' | wc -c)"
+            # make sure that MSB is set
+            # and that the public value is large enough
             if [[ $conservative == "True" ]] &&
                 openssl dsa -noout -text -in "$kAlias/$x509PKEY" | \
-                grep -A1 'pub:' | tail -n 1 | grep -E '^[[:space:]]*00:'; then
+                grep -A1 'pub:' | tail -n 1 | grep -E '^[[:space:]]*00:' &&
+                [[ $pub_chars == $prime_chars ]]; then
                 break
             fi
             if [[ $incompatible == "True" ]] &&
