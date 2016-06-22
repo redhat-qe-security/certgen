@@ -427,7 +427,7 @@ B<x509KeyGen>
 [B<-s> I<size>]
 [B<--params> I<alias>]
 [B<--conservative>]
-[B<--anti-conservative]
+[B<--anti-conservative>]
 I<alias>
 
 =back
