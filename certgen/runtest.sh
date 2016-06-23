@@ -412,6 +412,57 @@ rlJournalStart
         rlRun "x509RmAlias ca"
     rlPhaseEnd
 
+    rlPhaseStartTest "nameConstraints"
+        rlRun "x509KeyGen rootca"
+        options=(
+            '--ncPermit' 'example.com'
+            '--ncExclude' 'bad.example.com'
+            '--ncExclude' 'worse.example.com'
+            )
+        rlRun "x509SelfSign ${options[*]} rootca"
+        rlRun -s "x509DumpCert rootca |sed -n '/Permitted:/,/Excluded/ p'"
+        rlAssertGrep "DNS:example.com" "$rlRun_LOG"
+        rm -f "$rlRun_LOG"
+        rlRun -s "x509DumpCert rootca |sed -n '/Excluded:/,/Signature/ p'"
+        rlAssertGrep "DNS:bad.example.com" "$rlRun_LOG"
+        rlAssertGrep "DNS:worse.example.com" "$rlRun_LOG"
+        rm -f "$rlRun_LOG"
+        rlRun "x509KeyGen interca"
+        options=(
+            '--CA' 'rootca'
+            '-t' 'ca'
+            '--subjectAltName' 'DNS.1=ca.sub.example.com'
+            '--ncPermit' 'sub.example.com'
+            '--ncExclude' 'bad.sub.example.com'
+            )
+        rlRun "x509CertSign ${options[*]} interca"
+        rlRun -s "x509DumpCert interca |sed -n '/Permitted:/,/Excluded/ p'"
+        rlAssertGrep "DNS:sub.example.com" "$rlRun_LOG"
+        rm -f "$rlRun_LOG"
+        rlRun -s "x509DumpCert interca |sed -n '/Excluded:/,/Signature/ p'"
+        rlAssertGrep "DNS:bad.sub.example.com" "$rlRun_LOG"
+        rm -f "$rlRun_LOG"
+        rlRun "x509KeyGen server"
+        for t in www.sub.example.com:0 bad.example.com:2 bad.sub.example.com:2; do
+            server=${t%:*}
+            expected=${t#*:}
+            options=(
+                '--CA' 'interca'
+                '--subjectAltName' "DNS.1=$server"
+                '--noAuthKeyId'
+                )
+            rlRun "x509CertSign ${options[*]} server"
+            options=(
+                '-trusted' "$(x509Cert rootca)"
+                '-untrusted' "$(x509Cert interca)"
+                )
+            rlRun "openssl verify ${options[*]} $(x509Cert server)" $expected
+        done
+        rlRun "x509RmAlias rootca"
+        rlRun "x509RmAlias interca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
     rlPhaseStartCleanup
         rlRun "popd"
         rlRun "rm -r $TmpDir" 0 "Removing tmp directory"

@@ -405,6 +405,40 @@ EOF
 
 }
 
+# Converts object (to be name constrained) to syntax understood
+# by openssl.cnf
+__INTERNAL_x509NameToConstraint() {
+    local name="$1"
+    local result=""
+    if [[ $name =~ [A-Z]+:.+ ]]; then
+        result="$name"
+    elif [[ $name =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        result="IP:$name/255.255.255.255"
+    else
+        result="DNS:$name"
+    fi
+    echo $result
+}
+
+# Converts array of objects (to be name constrained) to specification
+# for openssl.cnf
+__INTERNAL_x509NamesToNCs() {
+    local -a names=("${!1}")
+    local keyword=$2
+    local -a constraints
+    local result=""
+    for name in "${names[@]}"; do
+        local constraint=$(__INTERNAL_x509NameToConstraint "$name")
+        constraints=("${constraints[@]}" "$keyword;$constraint")
+    done
+    oldIFS="$IFS"
+    IFS=,
+    result="${constraints[*]}"
+    IFS="$oldIFS"
+    echo "$result"
+}
+
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #   Functions
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -676,6 +710,9 @@ B<x509SelfSign>
 [B<--caTrue>]
 [B<--CN> I<commonName>]
 [B<--DN> I<part-of-dn>]
+[B<--ncPermit> I<HOST>]
+[B<--ncExclude> I<HOST>]
+[B<--ncNotCritical>]
 [B<--md> I<HASH>]
 [B<--noAuthKeyId>]
 [B<--noBasicConstraints>]
@@ -786,6 +823,24 @@ State or province name hosting the HQ.
 
 =back
 
+=item B<--ncPermit> I<HOST>
+
+Adds HOST to x509v3 nameConstraint as permitted (see RFC 5820).
+
+HOST can be a hostname (google.com), IP address (8.8.8.8),
+or something supported directly by openssl (IP:192.168.0.0/255.255.0.0,
+DNS:google.com - see man x509v3_config for details).
+    
+=item B<--ncExclude> I<HOST>
+
+Adds HOST to x509v3 nameConstraint as excluded (see RFC 5820).
+See B<--ncPermit> for details.
+
+=item B<--ncNotCritical>
+
+Marks nameConstraints as NOT critical, which is against RFC 5820.
+Default is critical.
+
 =item B<--md> I<HASH>
 
 Sets the cryptographic hash (message digest) for signing certificates.
@@ -886,6 +941,12 @@ x509SelfSign() {
     local bcPathLen=""
     # set the criticality flag for Basic Constraints
     local bcCritical=""
+    # permitted names as per RFC-5280
+    local -a namesPermitted
+    # excluded names as per RFC-5280
+    local -a namesExcluded
+    # flag set when name constraints are not to be marked critical
+    local ncCritical="critical,"
     # set the message digest algorithm used for signing
     local certMD=""
     # flag set when the Authority Key Identifier is not supposed to be
@@ -904,6 +965,9 @@ x509SelfSign() {
         -l caTrue \
         -l caFalse \
         -l noBasicConstraints \
+        -l ncPermit: \
+        -l ncExclude: \
+        -l ncNotCritical \
         -l bcPathLen: \
         -l bcCritical \
         -l noAuthKeyId \
@@ -942,6 +1006,12 @@ x509SelfSign() {
             --bcPathLen) bcPathLen="$2"; shift 2
                 ;;
             --bcCritical) bcCritical="true"; shift 1
+                ;;
+            --ncPermit) namesPermitted=("${namesPermitted[@]}" "$2"); shift 2
+                ;;
+            --ncExclude) namesExcluded=("${namesExcluded[@]}" "$2"); shift 2
+                ;;
+            --ncNotCritical) ncCritical=""; shift 1
                 ;;
             --md) certMD="$2"; shift 2
                 ;;
@@ -1095,6 +1165,15 @@ x509SelfSign() {
 
     if [[ ! -z $basicKeyUsage ]]; then
         parameters=("${parameters[@]}" "--basicKeyUsage=$basicKeyUsage")
+    fi
+
+    local nameConstraints="$(__INTERNAL_x509NamesToNCs namesPermitted[@] permitted)"
+    local joinedNamesExcluded="$(__INTERNAL_x509NamesToNCs namesExcluded[@] excluded)"
+    if [[ ! -z $joinedNamesExcluded ]]; then
+        nameConstraints="${nameConstraints},$joinedNamesExcluded"
+    fi
+    if [[ ! -z $nameConstraints && $nameConstraints != "," ]]; then
+        parameters=("${parameters[@]}" "--x509v3Extension=nameConstraints=$ncCritical$nameConstraints")
     fi
 
     if [[ ! -z $certMD ]]; then
@@ -1267,6 +1346,9 @@ B<x509CertSign>
 [B<--caTrue>]
 [B<--DN> I<DNPART>]
 [B<--extendedKeyUsage> I<EKU>]
+[B<--ncPermit> I<HOST>]
+[B<--ncExclude> I<HOST>]
+[B<--ncNotCritical>]
 [B<--md> I<HASHNAME>]
 [B<--noBasicConstraints>]
 [B<--notAfter> I<ENDDATE>]
@@ -1423,6 +1505,24 @@ third party).
 By default undefined for C<CA> role, I<serverAuth> for C<webserver> role and
 I<clientAuth,emailProtection> for C<webclient>.
 
+=item B<--ncPermit> I<HOST>
+
+Adds HOST to x509v3 nameConstraint as permitted (see RFC 5820).
+
+HOST can be a hostname (google.com), IP address (8.8.8.8),
+or something supported directly by openssl (IP:192.168.0.0/255.255.0.0,
+DNS:google.com - see man x509v3_config for details).
+    
+=item B<--ncExclude> I<HOST>
+
+Adds HOST to x509v3 nameConstraint as excluded (see RFC 5820).
+See B<--ncPermit> for details.
+
+=item B<--ncNotCritical>
+
+Marks nameConstraints as NOT critical, which is against RFC 5820.
+Default is critical.
+
 =item B<--md> I<HASHNAME>
 
 Sets the cryptographic hash (message digest) for signing certificates.
@@ -1575,6 +1675,12 @@ x509CertSign() {
     local bcPathLen=""
     # set the criticality flag for Basic Constraints
     local bcCritical=""
+    # permitted names as per RFC-5280
+    local -a namesPermitted
+    # excluded names as per RFC-5280
+    local -a namesExcluded
+    # flag set when name constraints are not to be marked critical
+    local ncCritical="critical,"
     # set the message digest used for signing the certificate
     # default is in config generator (sha256)
     local certMD=""
@@ -1610,6 +1716,9 @@ x509CertSign() {
         -l noBasicConstraints \
         -l bcPathLen: \
         -l bcCritical \
+        -l ncPermit: \
+        -l ncExclude: \
+        -l ncNotCritical \
         -l basicKeyUsage: \
         -l md: \
         -l subjectAltName: \
@@ -1652,6 +1761,12 @@ x509CertSign() {
             --bcCritical) bcCritical="true"; shift 1
                 ;;
             --basicKeyUsage) basicKeyUsage="$2"; shift 2
+                ;;
+            --ncPermit) namesPermitted=("${namesPermitted[@]}" "$2"); shift 2
+                ;;
+            --ncExclude) namesExcluded=("${namesExcluded[@]}" "$2"); shift 2
+                ;;
+            --ncNotCritical) ncCritical=""; shift 1
                 ;;
             --md) certMD="$2"; shift 2
                 ;;
@@ -1822,6 +1937,15 @@ x509CertSign() {
 
     if [[ ! -z $basicKeyUsage ]]; then
         parameters=("${parameters[@]}" "--basicKeyUsage=$basicKeyUsage")
+    fi
+
+    local nameConstraints="$(__INTERNAL_x509NamesToNCs namesPermitted[@] permitted)"
+    local joinedNamesExcluded="$(__INTERNAL_x509NamesToNCs namesExcluded[@] excluded)"
+    if [[ ! -z $joinedNamesExcluded ]]; then
+        nameConstraints="${nameConstraints},$joinedNamesExcluded"
+    fi
+    if [[ ! -z $nameConstraints && $nameConstraints != "," ]]; then
+        parameters=("${parameters[@]}" "--x509v3Extension=nameConstraints=$ncCritical$nameConstraints")
     fi
 
     if [[ ! -z $certMD ]]; then
