@@ -1169,10 +1169,12 @@ x509SelfSign() {
 
     local nameConstraints="$(__INTERNAL_x509NamesToNCs namesPermitted[@] permitted)"
     local joinedNamesExcluded="$(__INTERNAL_x509NamesToNCs namesExcluded[@] excluded)"
-    if [[ ! -z $joinedNamesExcluded ]]; then
-        nameConstraints="${nameConstraints},$joinedNamesExcluded"
+    if [[ ! -z $nameConstraints && ! -z $joinedNamesExcluded ]]; then
+        nameConstraints="${nameConstraints},${joinedNamesExcluded}"
+    else
+        nameConstraints="${nameConstraints}${joinedNamesExcluded}"
     fi
-    if [[ ! -z $nameConstraints && $nameConstraints != "," ]]; then
+    if [[ ! -z $nameConstraints ]]; then
         parameters=("${parameters[@]}" "--x509v3Extension=nameConstraints=$ncCritical$nameConstraints")
     fi
 
@@ -1941,10 +1943,12 @@ x509CertSign() {
 
     local nameConstraints="$(__INTERNAL_x509NamesToNCs namesPermitted[@] permitted)"
     local joinedNamesExcluded="$(__INTERNAL_x509NamesToNCs namesExcluded[@] excluded)"
-    if [[ ! -z $joinedNamesExcluded ]]; then
-        nameConstraints="${nameConstraints},$joinedNamesExcluded"
+    if [[ ! -z $nameConstraints && ! -z $joinedNamesExcluded ]]; then
+        nameConstraints="${nameConstraints},${joinedNamesExcluded}"
+    else
+        nameConstraints="${nameConstraints}${joinedNamesExcluded}"
     fi
-    if [[ ! -z $nameConstraints && $nameConstraints != "," ]]; then
+    if [[ ! -z $nameConstraints ]]; then
         parameters=("${parameters[@]}" "--x509v3Extension=nameConstraints=$ncCritical$nameConstraints")
     fi
 

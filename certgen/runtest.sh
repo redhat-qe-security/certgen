@@ -413,6 +413,73 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStartTest "nameConstraints"
+_ncGet () { # helper function for extracting nameConstraints from certificates
+    which=$1
+    name=$2
+    sed_cmd="ERROR"
+    if [[ $which = "permitted" ]]; then
+        sed_cmd='/Permitted:/,/Excluded/ p'
+    elif [[ $which = "excluded" ]]; then
+        sed_cmd='/Excluded:/,/Signature/ p'
+    else
+        sed_cmd="ERROR"
+    fi
+    x509DumpCert $name |sed -n "$sed_cmd"
+}
+
+        # basic sanity scenarios
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        # one permitted
+        options=('--ncPermit' 'good.com')
+        rlRun "x509SelfSign ${options[*]} ca"
+        rlRun "x509CertSign --CA ca ${options[*]} server"
+        rlRun "_ncGet permitted ca |grep good.com"
+        rlRun "_ncGet permitted server |grep good.com"
+        # one excluded
+        options=('--ncExclude' 'bad.com')
+        rlRun "x509SelfSign ${options[*]} ca"
+        rlRun "x509CertSign --CA ca ${options[*]} server"
+        rlRun "_ncGet excluded ca |grep bad.com"
+        rlRun "_ncGet excluded server |grep bad.com"
+        # one permitted and one excluded
+        options=(
+            '--ncPermit' 'good.com'
+            '--ncExclude' 'bad.com'
+            )
+        rlRun "x509SelfSign ${options[*]} ca"
+        rlRun "x509CertSign --CA ca ${options[*]} server"
+        rlRun "_ncGet permitted ca |grep good.com"
+        rlRun "_ncGet permitted server |grep good.com"
+        rlRun "_ncGet excluded ca |grep bad.com"
+        rlRun "_ncGet excluded server |grep bad.com"
+        # multiple permitted
+        options=(
+            '--ncPermit' 'good1.com'
+            '--ncPermit' 'good2.com'
+            )
+        rlRun "x509SelfSign ${options[*]} ca"
+        rlRun "x509CertSign --CA ca ${options[*]} server"
+        rlRun "_ncGet permitted ca |grep good1.com"
+        rlRun "_ncGet permitted ca |grep good2.com"
+        rlRun "_ncGet permitted server |grep good1.com"
+        rlRun "_ncGet permitted server |grep good2.com"
+        # multiple excluded
+        options=(
+            '--ncExclude' 'bad1.com'
+            '--ncExclude' 'bad2.com'
+            )
+        rlRun "x509SelfSign ${options[*]} ca"
+        rlRun "x509CertSign --CA ca ${options[*]} server"
+        rlRun "_ncGet excluded ca |grep bad1.com"
+        rlRun "_ncGet excluded ca |grep bad2.com"
+        rlRun "_ncGet excluded server |grep bad1.com"
+        rlRun "_ncGet excluded server |grep bad2.com"
+        # cleanup
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+
+        # complex scenario
         rlRun "x509KeyGen rootca"
         options=(
             '--ncPermit' 'example.com'
