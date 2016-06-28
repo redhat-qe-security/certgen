@@ -2093,7 +2093,7 @@ file first.
 
 =cut
 
-function x509Key() {
+x509Key() {
 
     # generate DER file?
     local der="false"
@@ -2282,7 +2282,7 @@ of the file. Uses empty string by default
 
 =cut
 
-function x509Cert() {
+x509Cert() {
 
     # generate DER file?
     local der="false"
@@ -2402,7 +2402,7 @@ Specify the name of the certificate to dump
 
 =cut
 
-function x509DumpCert(){
+x509DumpCert(){
 
     openssl x509 -in $(x509Cert "$1") -noout -text
 }
@@ -2431,7 +2431,7 @@ Name of the private key to remove
 
 =cut
 
-function x509RmAlias() {
+x509RmAlias() {
 
     if [[ -e $1/$x509PKEY ]]; then
         rm -rf "$1"
