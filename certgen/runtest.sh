@@ -701,7 +701,14 @@ _ncGet () { # helper function for extracting nameConstraints from certificates
                 '-trusted' "$(x509Cert rootca)"
                 '-untrusted' "$(x509Cert interca)"
                 )
-            rlRun "openssl verify ${options[*]} $(x509Cert server)" $expected
+            if rlIsRHEL 6 && rlIsRHEL '<6.5' && [[ $expected -eq 2 ]]; then
+                # workaround for older RHEL-6, different return values of verify
+                rlRun -s "openssl verify ${options[*]} $(x509Cert server)" 0
+                rlAssertGrep "^error.*lookup:excluded subtree violation" $rlRun_LOG
+                rm -f $rlRun_LOG
+            else
+                rlRun "openssl verify ${options[*]} $(x509Cert server)" $expected
+            fi
         done
         rlRun "x509RmAlias rootca"
         rlRun "x509RmAlias interca"
