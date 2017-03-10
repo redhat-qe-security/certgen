@@ -257,6 +257,55 @@ rlJournalStart
         done
     rlPhaseEnd
 
+    # RSA-PSS (and alternative padding modes in general) are not supported
+    # on OpenSSL 0.9.8
+    if ! rlIsRHEL '<6'; then
+        rlPhaseStartTest "Signature padding modes"
+            rlLogInfo "Default message digest, RSASSA-PSS padding"
+            rlRun "x509KeyGen -t rsa ca"
+            rlRun "x509SelfSign --padding pss ca"
+            rlRun -s "x509DumpCert ca"
+            rlAssertGrep "Signature Algorithm: rsassaPss" $rlRun_LOG
+            rlAssertGrep "Mask Algorithm: mgf1 with sha256" $rlRun_LOG
+            # maximum salt length in bytes for 2048 bit modulus and sha256 hash
+            # encoded as hex
+            rlAssertGrep "Salt Length: (0x|)DE" $rlRun_LOG -E
+            rlRun "x509RmAlias ca"
+
+            rlLogInfo "Default message digest with RSA-PSS and salt len equal to hash size"
+            rlRun "x509KeyGen -t rsa ca"
+            rlRun "x509KeyGen -t rsa server"
+            rlRun "x509KeyGen -t rsa server-salt"
+            rlRun "x509SelfSign --padding pss --pssSaltLen -1 ca"
+            rlRun -s "x509DumpCert ca"
+            rlAssertGrep "Signature Algorithm: rsassaPss" $rlRun_LOG
+            rlAssertGrep "Mask Algorithm: mgf1 with sha256" $rlRun_LOG
+            # sha256 output length in bytes, encoded as hex
+            rlAssertGrep "Salt Length: (0x|)20" $rlRun_LOG -E
+            rlRun "x509CertSign --CA ca --padding pss server"
+            rlRun -s "x509DumpCert server"
+            rlAssertGrep "Signature Algorithm: rsassaPss" $rlRun_LOG
+            rlAssertGrep "Mask Algorithm: mgf1 with sha256" $rlRun_LOG
+            # maximum salt length in bytes for 2048 bit modulus and sha256 hash
+            # encoded as hex
+            rlAssertGrep "Salt Length: (0x|)DE" $rlRun_LOG -E
+            rlRun "x509CertSign --CA ca --padding pss --pssSaltLen -1 server-salt"
+            rlRun -s "x509DumpCert server-salt"
+            rlAssertGrep "Signature Algorithm: rsassaPss" $rlRun_LOG
+            rlAssertGrep "Mask Algorithm: mgf1 with sha256" $rlRun_LOG
+            # sha256 output length in bytes, encoded as hex
+            rlAssertGrep "Salt Length: (0x|)20" $rlRun_LOG -E
+            rlRun -s "openssl verify -CAfile $(x509Cert ca) $(x509Cert server)"
+            rlAssertGrep "OK" "$rlRun_LOG"
+            rlRun -s "openssl verify -CAfile $(x509Cert ca) $(x509Cert server-salt)"
+            rlAssertGrep "OK" "$rlRun_LOG"
+            rlRun "rm $rlRun_LOG"
+            rlRun "x509RmAlias ca"
+            rlRun "x509RmAlias server"
+            rlRun "x509RmAlias server-salt"
+        rlPhaseEnd
+    fi
+
     rlPhaseStartTest "Certificate profiles"
         rlRun "x509KeyGen ca"
         rlRun "x509KeyGen subca"

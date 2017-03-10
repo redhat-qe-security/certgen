@@ -714,6 +714,8 @@ B<x509SelfSign>
 [B<--ncExclude> I<HOST>]
 [B<--ncNotCritical>]
 [B<--md> I<HASH>]
+[B<--padding> I<PADDING>]
+[B<--pssSaltLen> I<SALTLEN>]
 [B<--noAuthKeyId>]
 [B<--noBasicConstraints>]
 [B<--noSubjKeyId>]
@@ -852,6 +854,19 @@ SHA256 by default, will be updated to weakeast hash recommended by NIST or
 generally thought to be secure. SHA1 in case the openssl version installed
 doesn't support SHA256.
 
+=item B<--padding> I<PADDING>
+
+Set the specified RSA padding type for the certificate signature. Acceptable
+values are B<pkcs1> (the default, for PKCS#1 v1.5 padding with DigestInfo),
+B<x931> (for X 9.31 padding) and B<pss> (for RSASSA-PSS padding).
+
+=item B<--pssSaltLen> I<SALTLEN>
+
+Set the length of used salt (in bytes) that will be used to create the
+signature. Special values are: B<-1> for setting the salt size to the size
+of used message digest, B<-2> for automatically determining the size of
+the salt and B<-3> for using the maximum possible salt size.
+
 =item B<--noAuthKeyId>
 
 Do not set the Authority Key Identifier extension in the certificate.
@@ -949,6 +964,10 @@ x509SelfSign() {
     local ncCritical="critical,"
     # set the message digest algorithm used for signing
     local certMD=""
+    # set the padding mode used for signature
+    local sigPad=""
+    # set the length of salt used in RSA-PSS signatures
+    local pssSaltLen=""
     # flag set when the Authority Key Identifier is not supposed to be
     # added to certificate
     local noAuthKeyId=""
@@ -973,6 +992,8 @@ x509SelfSign() {
         -l noAuthKeyId \
         -l noSubjKeyId \
         -l md: \
+        -l padding: \
+        -l pssSaltLen: \
         -n x509SelfSign -- "$@")
     if [ $? -ne 0 ]; then
         echo "X509SelfSign: can't parse options" >&2
@@ -1015,6 +1036,10 @@ x509SelfSign() {
                 ;;
             --md) certMD="$2"; shift 2
                 ;;
+            --padding) sigPad="$2"; shift 2
+                ;;
+            --pssSaltLen) pssSaltLen="$2"; shift 2
+                ;;
             --noAuthKeyId) noAuthKeyId="true"; shift 1
                 ;;
             --noSubjKeyId) noSubjKeyId="true"; shift 1
@@ -1036,6 +1061,13 @@ x509SelfSign() {
     if [ ! -d "$kAlias" ] || [ ! -e "$kAlias/$x509PKEY" ]; then
         echo "x509SelfSign: private key '$kAlias' has not yet been generated"\
             >&2
+        return 1
+    fi
+
+    if [[ "$sigPad" && "$sigPad" != "pss" && "$pssSaltLen" ]] \
+        || [[ -z "$sigPad" && "$pssSaltLen" ]]; then
+
+        echo "x509SelfSign: pssSaltLen is only applicable to pss padding" >&2
         return 1
     fi
 
@@ -1194,13 +1226,20 @@ x509SelfSign() {
     #
     # create self signed certificate
     #
+    declare -a options=()
+    if [[ ! -z $sigPad ]]; then
+        options=("${options[@]}" "-sigopt" "rsa_padding_mode:$sigPad")
+    fi
+    if [[ ! -z $pssSaltLen ]]; then
+        options=("${options[@]}" "-sigopt" "rsa_pss_saltlen:$pssSaltLen")
+    fi
 
     # because we want to have full control over certificate fields
     # (like notBefore and notAfter) we have to create the certificate twice
 
     # create dummy self signed certificate
     openssl req -x509 -new -key $kAlias/$x509PKEY -out $kAlias/temp-$x509CERT \
-        -batch -config $kAlias/$x509CACNF
+        -batch -config $kAlias/$x509CACNF "${options[@]}"
     if [ $? -ne 0 ]; then
         echo "x509SelfSign: temporary certificate generation failed" >&2
         return 1
@@ -1218,6 +1257,12 @@ x509SelfSign() {
     caOptions=("${caOptions[@]}" "-preserveDN")
     if [[ $certV == "3" ]]; then
         caOptions=("${caOptions[@]}" "-extensions" "v3_ext")
+    fi
+    if [[ ! -z "$sigPad" ]]; then
+        caOptions=("${caOptions[@]}" "-sigopt" "rsa_padding_mode:$sigPad")
+    fi
+    if [[ ! -z "$pssSaltLen" ]]; then
+        caOptions=("${caOptions[@]}" "-sigopt" "rsa_pss_saltlen:$pssSaltLen")
     fi
 
     # sign the certificate using the full CA functionality to get proper
@@ -1352,6 +1397,8 @@ B<x509CertSign>
 [B<--ncExclude> I<HOST>]
 [B<--ncNotCritical>]
 [B<--md> I<HASHNAME>]
+[B<--padding> I<PADDING>]
+[B<--pssSaltLen> I<SALTLEN>]
 [B<--noBasicConstraints>]
 [B<--notAfter> I<ENDDATE>]
 [B<--notBefore> I<STARTDATE>]
@@ -1535,6 +1582,19 @@ For example, you can't sign using ECDSA and MD5.
 SHA256 by default, will be updated to weakeast hash recommended by NIST or
 generally thought to be secure.
 
+=item B<--padding> I<PADDING>
+
+Set the specified RSA padding type for the certificate signature. Acceptable
+values are B<pkcs1> (the default, for PKCS#1 v1.5 padding with DigestInfo),
+B<x931> (for X 9.31 padding) and B<pss> (for RSASSA-PSS padding).
+
+=item B<--pssSaltLen> I<SALTLEN>
+
+Set the length of used salt (in bytes) that will be used to create the
+signature. Special values are: B<-1> for setting the salt size to the size
+of used message digest, B<-2> for automatically determining the size of
+the salt and B<-3> for using the maximum possible salt size.
+
 =item B<--noAuthKeyId>
 
 Do not add the Authority Key Identifier extension to generated certificates.
@@ -1686,6 +1746,10 @@ x509CertSign() {
     # set the message digest used for signing the certificate
     # default is in config generator (sha256)
     local certMD=""
+    # set the RSA signature padding mode
+    local sigPad=""
+    # set the length of the salt used with RSA-PSS signatures
+    local pssSaltLen=""
     # sets the Basic Key Usage
     local basicKeyUsage=""
     # distinguished name of the signed certificate
@@ -1723,6 +1787,8 @@ x509CertSign() {
         -l ncNotCritical \
         -l basicKeyUsage: \
         -l md: \
+        -l padding: \
+        -l pssSaltLen: \
         -l subjectAltName: \
         -l subjectAltNameCritical \
         -l ocspResponderURI: \
@@ -1771,6 +1837,10 @@ x509CertSign() {
             --ncNotCritical) ncCritical=""; shift 1
                 ;;
             --md) certMD="$2"; shift 2
+                ;;
+            --padding) sigPad="$2"; shift 2
+                ;;
+            --pssSaltLen) pssSaltLen="$2"; shift 2
                 ;;
             --subjectAltName) subjectAltName=("${subjectAltName[@]}" "$2"); shift 2
                 ;;
@@ -1846,6 +1916,13 @@ x509CertSign() {
                 return 1
                 ;;
         esac
+    fi
+
+    if [[ "$sigPad" && "$sigPad" != "pss" && "$pssSaltLen" ]] \
+        || [[ -z "$sigPad" && "$pssSaltLen" ]]; then
+
+        echo "x509SelfSign: pssSaltLen is only applicable to pss padding" >&2
+        return 1
     fi
 
     if [[ -z $notAfter ]] && [[ $certRole == "ca" ]]; then
@@ -2008,6 +2085,12 @@ x509CertSign() {
     caOptions=("${caOptions[@]}" "-preserveDN")
     if [[ $certV == "3" ]]; then
         caOptions=("${caOptions[@]}" "-extensions" "v3_ext")
+    fi
+    if [[ ! -z $sigPad ]]; then
+        caOptions=("${caOptions[@]}" "-sigopt" "rsa_padding_mode:$sigPad")
+    fi
+    if [[ ! -z $pssSaltLen ]]; then
+        caOptions=("${caOptions[@]}" "-sigopt" "rsa_pss_saltlen:$pssSaltLen")
     fi
 
     openssl ca -config "$caAlias/$x509CACNF" -batch \
