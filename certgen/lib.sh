@@ -138,7 +138,7 @@ Name of file with private and public key. F<key.pem> by default
 
 =item B<x509OPENSSL>
 
-Path to the openssl tool used as a backend. F<openssl> by default.
+Path to the openssl tool used as the backend. F<openssl> by default.
 
 =back
 
@@ -474,6 +474,7 @@ B<x509KeyGen>
 [B<--params> I<alias>]
 [B<--conservative>]
 [B<--anti-conservative>]
+[B<--gen-opts> I<opts>]
 I<alias>
 
 =back
@@ -484,7 +485,7 @@ I<alias>
 
 Type of key pair to generate. Acceptable values are I<RSA> and I<DSA>. In
 case the script is running on RHEL 6.5, RHEL 7.0, Fedora 19 or later, I<ECDSA>
-is also supported.
+is also supported. For I<RSA-PSS>, OpenSSL 1.1.1 is required.
 
 I<RSA> by default.
 
@@ -526,6 +527,12 @@ size of PQG DSA parameters incorrecty - the G parameter won't have its MSB set.
 This is sort-of reverse of --conservative, the default behaviour is to generate
 a set of paramters randomly.
 
+=item B<--gen-opts> I<opts>
+
+Set additional key generation options for non rsa, dsa and ec key generation.
+
+Example options include I<rsa_pss_keygen_md:digest> for RSA-PSS keygen.
+
 =item I<alias>
 
 Name of directory in which the generated key pair will be placed.
@@ -555,12 +562,19 @@ x509KeyGen() {
     local conservative="False"
     # whether to gen unsafe paramters that are known to break interoperability
     local incompatible="False"
+    # additional options for keygen
+    local genpkeyOpts
+    declare -a genpkeyOpts
+    genpkeyOpts=()
 
     #
     # parse options
     #
 
-    local TEMP=$(getopt -o t:s: -l params: -l conservative -l anti-conservative \
+    local TEMP=$(getopt -o t:s: -l params: \
+                 -l conservative \
+                 -l anti-conservative \
+                 -l gen-opts: \
                  -n x509KeyGen -- "$@")
     if [ $? -ne 0 ]; then
         echo "x509KeyGen: can't parse options" >&2
@@ -580,6 +594,10 @@ x509KeyGen() {
             --conservative) conservative="True"; shift 1
                 ;;
             --anti-conservative) incompatible="True"; shift 1
+                ;;
+            --gen-opts) genpkeyOpts=("${genpkeyOpts[@]}" \
+                                     "-pkeyopt" "$2")
+                shift 2
                 ;;
             --) shift 1
                 break
@@ -604,7 +622,7 @@ x509KeyGen() {
         return 1
     fi
     if [[ $kType != "RSA" ]] && [[ $kType != "DSA" ]] \
-        && [[ $kType != "ECDSA" ]]; then
+        && [[ $kType != "ECDSA" ]] && [[ $kType != "RSA-PSS" ]]; then
 
         echo "x509KeyGen: Unknown key type: $kType" >&2
         return 1
@@ -696,8 +714,23 @@ x509KeyGen() {
                 break
             fi
         done
-    else # RSA
+    elif [[ $kType == "RSA" ]]; then
         ${x509OPENSSL} genrsa -out "$kAlias/$x509PKEY" "$kSize"
+        if [ $? -ne 0 ]; then
+            echo "x509KeyGen: Key generation failed" >&2
+        fi
+    else # RSA-PSS, DH, GOST2001
+        local options
+        declare -a options
+        options=("-out" "$kAlias/$x509PKEY")
+        options=("${options[@]}" "-algorithm" "$kType")
+        if [[ $kType == "RSA-PSS" ]]; then
+            options=("${options[@]}" "-pkeyopt" "rsa_keygen_bits:$kSize")
+        fi
+        if [[ ${#genpkeyOpts[@]} -gt 0 ]]; then
+            options=("${options[@]}" "${genpkeyOpts[@]}")
+        fi
+        ${x509OPENSSL} genpkey "${options[@]}"
         if [ $? -ne 0 ]; then
             echo "x509KeyGen: Key generation failed" >&2
         fi

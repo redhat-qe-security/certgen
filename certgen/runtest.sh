@@ -306,6 +306,51 @@ rlJournalStart
         rlPhaseEnd
     fi
 
+    # RSA-PSS certificates are only supported with OpenSSL 1.1.1 and later
+    if ! ${x509OPENSSL} version | grep -Eq '0[.]9[.]|1[.]0[.]|1[.]1[.]0'; then
+        rlPhaseStartTest "RSA-PSS certificates"
+            rlRun "x509KeyGen -t rsa-pss ca"
+            rlRun -s "${x509OPENSSL} pkey -noout -text -in $(x509Key ca)"
+            # check if private key has the RSA-PSS identifier
+            rlAssertGrep "RSA-PSS Private-Key" $rlRun_LOG
+            rlAssertGrep "No PSS parameter restrictions" $rlRun_LOG
+            rlAssertGrep "2048 bit" $rlRun_LOG
+            rlRun "x509RmAlias ca"
+            # check if the command line options work
+            rlRun "x509KeyGen -t rsa-pss -s 3072 --gen-opts rsa_pss_keygen_md:sha256 --gen-opts rsa_pss_keygen_saltlen:20 ca"
+            rlRun -s "${x509OPENSSL} pkey -noout -text -in $(x509Key ca)"
+            rlAssertGrep "RSA-PSS Private-Key" $rlRun_LOG
+            rlAssertGrep "3072 bit" $rlRun_LOG
+            rlAssertNotGrep "No PSS parameter restrictions" $rlRun_LOG
+            rlAssertGrep "PSS parameter restrictions" $rlRun_LOG
+            rlAssertGrep "Hash Algorithm: sha256" $rlRun_LOG
+            rlAssertGrep "Minimum Salt Length: 0x14" $rlRun_LOG
+            rlRun "x509SelfSign ca"
+            rlRun -s "x509DumpCert ca"
+            # verify the restrictions are transferred to certificate
+            rlRun "grep -A3 'PSS parameter restrictions' $rlRun_LOG > restrictions.txt"
+            rlAssertGrep "Hash Algorithm: sha256" restrictions.txt
+            rlAssertGrep "Minimum Salt Length: 0x14" restrictions.txt
+            rlRun "rm $rlRun_LOG restrictions.txt"
+            # check if rsa-pss certificate automatically creates rsa-pss
+            # signatures
+            rlRun "x509RmAlias ca"
+            rlRun "x509KeyGen -t rsa-pss ca"
+            rlRun "x509SelfSign ca"
+            rlRun "x509KeyGen -t rsa-pss server"
+            rlRun "x509CertSign --CA ca server"
+            rlRun -s "x509DumpCert server"
+            rlAssertGrep "RSA-PSS Public-Key" $rlRun_LOG
+            rlAssertGrep "Hash Algorithm: sha256" $rlRun_LOG
+            rlAssertGrep "Signature Algorithm: rsassaPss" $rlRun_LOG
+            rlRun "rm $rlRun_LOG"
+            # check if they can be verified
+            rlRun "${x509OPENSSL} verify -CAfile $(x509Cert ca) -purpose sslserver $(x509Cert server)"
+            rlRun "x509RmAlias ca"
+            rlRun "x509RmAlias server"
+        rlPhaseEnd
+    fi
+
     rlPhaseStartTest "Certificate profiles"
         rlRun "x509KeyGen ca"
         rlRun "x509KeyGen subca"
