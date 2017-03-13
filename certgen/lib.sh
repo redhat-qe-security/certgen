@@ -310,13 +310,20 @@ __INTERNAL_x509GenConfig() {
         echo $x509FIRSTSERIAL > $kAlias/$x509CASERIAL
     fi
 
-    cat > "$kAlias/$x509CACNF" <<EOF
+    # OpenSSL 1.1.0 (? 1.1.1 definitely has) has the OID definition
+    if ${x509OPENSSL} version | grep -Eq '0[.]9[.]|1[.]0[.]'; then
+        cat > "$kAlias/$x509CACNF" <<EOF
 oid_section = new_oids
 
 [ new_oids ]
 ocspSigning = 1.3.6.1.5.5.7.3.9
-ocspNoCheck = 1.3.6.1.5.5.7.48.1.5
+noCheck = 1.3.6.1.5.5.7.48.1.5
 
+EOF
+    else
+        cat /dev/null > "$kAlias/$x509CACNF"
+    fi
+    cat >> "$kAlias/$x509CACNF" <<EOF
 [ ca ]
 default_ca = ca_cnf
 
@@ -2060,10 +2067,10 @@ x509CertSign() {
 
     # DER:05:00 is a DER encoding of NULL (empty)
     if [[ $ocspNoCheck == "true" ]]; then
-        parameters=("${parameters[@]}" "--x509v3Extension=ocspNoCheck=DER:05:00")
+        parameters=("${parameters[@]}" "--x509v3Extension=noCheck=DER:05:00")
     fi
     if [[ $ocspNoCheck == "critical" ]]; then
-        parameters=("${parameters[@]}" "--x509v3Extension=ocspNoCheck=critical,DER:05:00")
+        parameters=("${parameters[@]}" "--x509v3Extension=noCheck=critical,DER:05:00")
     fi
 
     if [[ $noSubjKeyId != "true" ]]; then
