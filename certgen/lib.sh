@@ -636,7 +636,7 @@ x509KeyGen() {
         if [[ -z $paramAlias ]]; then
             while true; do
                 rm -f "$kAlias/dsa_params.pem"
-                ${x509OPENSSL} dsaparam "$kSize" -out "$kAlias/dsa_params.pem"
+                ${x509OPENSSL} dsaparam -out "$kAlias/dsa_params.pem" "$kSize"
                 if [ $? -ne 0 ]; then
                     echo "x509KeyGen: Parameter generation failed" >&2
                     return 1
