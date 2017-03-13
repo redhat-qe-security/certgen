@@ -136,6 +136,10 @@ by B<x509Key> and B<x509Cert> functions.
 
 Name of file with private and public key. F<key.pem> by default
 
+=item B<x509OPENSSL>
+
+Path to the openssl tool used as a backend. F<openssl> by default.
+
 =back
 
 Note that changing the values of above variables between running different
@@ -155,7 +159,8 @@ x509CACNF=${x509CACNF:-ca.cnf}
 x509CAINDEX=${x509CAINDEX:-index.txt}
 x509CASERIAL=${x509CASERIAL:-serial}
 x509FIRSTSERIAL=${x509FIRSTSERIAL:-01}
-if openssl version | grep -q '0[.]9[.].'; then
+x509OPENSSL=${x509OPENSSL:-openssl}
+if ${x509OPENSSL} version | grep -q '0[.]9[.].'; then
     x509FORMAT=${x509FORMAT:-+%y%m%d%H%M%SZ}
 else
     x509FORMAT=${x509FORMAT:-+%Y%m%d%H%M%SZ}
@@ -170,7 +175,7 @@ __INTERNAL_x509GenConfig() {
     # variable that has the DN broken up by items, most significant first
     declare -a dn
     # hash used to sign the certificate
-    if openssl version | grep -q '0[.]9[.]7'; then
+    if ${x509OPENSSL} version | grep -q '0[.]9[.]7'; then
         local md="sha1"
     else
         local md="sha256"
@@ -622,7 +627,7 @@ x509KeyGen() {
     mkdir -p "$kAlias"
 
     if [[ $kType == "ECDSA" ]]; then
-        openssl ecparam -genkey -name "$kSize" -out "$kAlias/$x509PKEY"
+        ${x509OPENSSL} ecparam -genkey -name "$kSize" -out "$kAlias/$x509PKEY"
         if [ $? -ne 0 ]; then
             echo "x509KeyGen: Key generation failed" >&2
             return 1
@@ -631,7 +636,7 @@ x509KeyGen() {
         if [[ -z $paramAlias ]]; then
             while true; do
                 rm -f "$kAlias/dsa_params.pem"
-                openssl dsaparam "$kSize" -out "$kAlias/dsa_params.pem"
+                ${x509OPENSSL} dsaparam "$kSize" -out "$kAlias/dsa_params.pem"
                 if [ $? -ne 0 ]; then
                     echo "x509KeyGen: Parameter generation failed" >&2
                     return 1
@@ -640,12 +645,12 @@ x509KeyGen() {
                     break
                 fi
                 if [[ $conservative == "True" ]] &&
-                    openssl dsaparam -noout -text -in "$kAlias/dsa_params.pem" | \
+                    ${x509OPENSSL} dsaparam -noout -text -in "$kAlias/dsa_params.pem" | \
                     grep -iA1 'G:' | tail -n 1 | grep -E '^[[:space:]]*00:'; then
                     break
                 fi
                 if [[ $incompatible == "True" ]] &&
-                    openssl dsaparam -noout -text -in "$kAlias/dsa_params.pem" |\
+                    ${x509OPENSSL} dsaparam -noout -text -in "$kAlias/dsa_params.pem" |\
                     grep -iA1 'G:' | tail -n 1 | grep -E '^[[:space:]]*[1-3]'; then
                     break
                 fi
@@ -656,7 +661,7 @@ x509KeyGen() {
         fi
 
         while true; do
-            openssl gendsa -out "$kAlias/$x509PKEY" "$dsaParams"
+            ${x509OPENSSL} gendsa -out "$kAlias/$x509PKEY" "$dsaParams"
             if [ $? -ne 0 ]; then
                 echo "x509KeyGen: Key generation failed" >&2
                 return 1
@@ -666,26 +671,26 @@ x509KeyGen() {
             fi
             local prime_chars
             local pub_chars
-            prime_chars="$(openssl dsa -noout -text -in "$kAlias/$x509PKEY" | \
+            prime_chars="$(${x509OPENSSL} dsa -noout -text -in "$kAlias/$x509PKEY" | \
                 grep -iA 100 '^P:' | grep -iB 100 '^Q:' | wc -c)"
-            pub_chars="$(openssl dsa -noout -text -in "$kAlias/$x509PKEY" | \
+            pub_chars="$(${x509OPENSSL} dsa -noout -text -in "$kAlias/$x509PKEY" | \
                 grep -iA 100 'pub:' | grep -iB 100 '^P:' | wc -c)"
             # make sure that MSB is set
             # and that the public value is large enough
             if [[ $conservative == "True" ]] &&
-                openssl dsa -noout -text -in "$kAlias/$x509PKEY" | \
+                ${x509OPENSSL} dsa -noout -text -in "$kAlias/$x509PKEY" | \
                 grep -A1 'pub:' | tail -n 1 | grep -E '^[[:space:]]*00:' &&
                 [[ $pub_chars == $prime_chars ]]; then
                 break
             fi
             if [[ $incompatible == "True" ]] &&
-                openssl dsa -noout -text -in "$kAlias/$x509PKEY" | \
+                ${x509OPENSSL} dsa -noout -text -in "$kAlias/$x509PKEY" | \
                 grep -A1 'pub:' | tail -n 1 | grep -E '^[[:space:]]*[1-3]'; then
                 break
             fi
         done
     else # RSA
-        openssl genrsa -out "$kAlias/$x509PKEY" "$kSize"
+        ${x509OPENSSL} genrsa -out "$kAlias/$x509PKEY" "$kSize"
         if [ $? -ne 0 ]; then
             echo "x509KeyGen: Key generation failed" >&2
         fi
@@ -1238,7 +1243,8 @@ x509SelfSign() {
     # (like notBefore and notAfter) we have to create the certificate twice
 
     # create dummy self signed certificate
-    openssl req -x509 -new -key $kAlias/$x509PKEY -out $kAlias/temp-$x509CERT \
+    ${x509OPENSSL} req -x509 -new -key $kAlias/$x509PKEY \
+        -out $kAlias/temp-$x509CERT \
         -batch -config $kAlias/$x509CACNF "${options[@]}"
     if [ $? -ne 0 ]; then
         echo "x509SelfSign: temporary certificate generation failed" >&2
@@ -1246,7 +1252,8 @@ x509SelfSign() {
     fi
 
     # create CSR for signing by the dummy certificate
-    openssl x509 -x509toreq -signkey $kAlias/$x509PKEY -out $kAlias/$x509CSR \
+    ${x509OPENSSL} x509 -x509toreq -signkey $kAlias/$x509PKEY \
+        -out $kAlias/$x509CSR \
         -in $kAlias/temp-$x509CERT
     if [ $? -ne 0 ]; then
         echo "x509SelfSign: certificate signing request failed" >&2
@@ -1267,7 +1274,8 @@ x509SelfSign() {
 
     # sign the certificate using the full CA functionality to get proper
     # key id and subject key identifier
-    openssl ca -config $kAlias/$x509CACNF -batch -keyfile $kAlias/$x509PKEY \
+    ${x509OPENSSL} ca -config $kAlias/$x509CACNF -batch \
+        -keyfile $kAlias/$x509PKEY \
         -cert $kAlias/temp-$x509CERT -in $kAlias/$x509CSR \
         -out $kAlias/$x509CERT "${caOptions[@]}"
     if [ $? -ne 0 ]; then
@@ -1290,7 +1298,8 @@ x509SelfSign() {
         return 1
     fi
 
-    openssl ca -config $kAlias/$x509CACNF -batch -keyfile $kAlias/$x509PKEY \
+    ${x509OPENSSL} ca -config $kAlias/$x509CACNF -batch \
+        -keyfile $kAlias/$x509PKEY \
         -cert $kAlias/temp-$x509CERT -in $kAlias/$x509CSR \
         -out $kAlias/$x509CERT "${caOptions[@]}"
 
@@ -2074,7 +2083,8 @@ x509CertSign() {
     # create the certificate
     #
 
-    openssl req -new -batch -key "$kAlias/$x509PKEY" -out "$kAlias/$x509CSR" \
+    ${x509OPENSSL} req -new -batch -key "$kAlias/$x509PKEY" \
+        -out "$kAlias/$x509CSR" \
         -config "$caAlias/$x509CACNF"
     if [ $? -ne 0 ]; then
         echo "x509CertSign: Certificate Signing Request generation failed" >&2
@@ -2093,7 +2103,7 @@ x509CertSign() {
         caOptions=("${caOptions[@]}" "-sigopt" "rsa_pss_saltlen:$pssSaltLen")
     fi
 
-    openssl ca -config "$caAlias/$x509CACNF" -batch \
+    ${x509OPENSSL} ca -config "$caAlias/$x509CACNF" -batch \
         -keyfile "$caAlias/$x509PKEY" \
         -cert "$caAlias/$x509CERT" \
         -in "$kAlias/$x509CSR" \
@@ -2233,7 +2243,7 @@ x509Key() {
     if [[ $der == "true" ]]; then
         if [[ $pkcs8 == "true" ]]; then
             if [[ ! -e $kAlias/$x509PKCS8DERKEY ]]; then
-                openssl pkcs8 -topk8 -in "$kAlias/$x509PKEY" -nocrypt \
+                ${x509OPENSSL} pkcs8 -topk8 -in "$kAlias/$x509PKEY" -nocrypt \
                     -outform DER -out "$kAlias/$x509PKCS8DERKEY"
             fi
             echo "$kAlias/$x509PKCS8DERKEY"
@@ -2241,19 +2251,22 @@ x509Key() {
             if [[ ! -e $kAlias/$x509DERKEY ]]; then
                 # openssl 0.9.8 doesn't have pkey subcommand, simulate it with
                 # rsa and dsa subcommands, ec subcommand is not supported there
-                if openssl version | grep -q '0[.]9[.].'; then
+                if ${x509OPENSSL} version | grep -q '0[.]9[.].'; then
                     if [[ -e "$kAlias/dsa_params.pem" ]]; then
-                        openssl dsa -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
+                        ${x509OPENSSL} dsa -in "$kAlias/$x509PKEY" \
+                            -outform DER -out "$kAlias/$x509DERKEY"
                     elif grep -q 'BEGIN RSA PRIVATE KEY' "$kAlias/$x509PKEY" \
                         || grep -q 'BEGIN PRIVATE KEY' "$kAlias/$x509PKEY"; then
-                        openssl rsa -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
+                        ${x509OPENSSL} rsa -in "$kAlias/$x509PKEY" \
+                            -outform DER -out "$kAlias/$x509DERKEY"
                     else
                         echo "Private key in unknown format" >&2
                         return 1
                     fi
 
                 else
-                    openssl pkey -in "$kAlias/$x509PKEY" -outform DER -out "$kAlias/$x509DERKEY"
+                    ${x509OPENSSL} pkey -in "$kAlias/$x509PKEY" -outform DER \
+                        -out "$kAlias/$x509DERKEY"
                 fi
             fi
             echo "$kAlias/$x509DERKEY"
@@ -2267,7 +2280,7 @@ x509Key() {
             # NSS doesn't support MACs other than MD5 and SHA1, or encryption
             # stronger than 3DES, see RHBZ#1220573
             # old OpenSSL doesn't support setting MAC at all
-            if openssl version | grep -q '0[.]9[.].'; then
+            if ${x509OPENSSL} version | grep -q '0[.]9[.].'; then
                 options=(${options[@]} -keypbe PBE-SHA1-3DES)
             else
                 options=(${options[@]} -keypbe DES-EDE3-CBC -macalg SHA1)
@@ -2279,19 +2292,19 @@ x509Key() {
 
                 # old OpenSSL versions don't support no encryption on certs
                 # use the weakest suppported by current (2015) FIPS
-                if openssl version | grep -q '0[.]9[.]7'; then
+                if ${x509OPENSSL} version | grep -q '0[.]9[.]7'; then
                     options=(${options[@]} -certpbe PBE-SHA1-3DES)
                 else
                     options=(${options[@]} -certpbe NONE)
                 fi
             else
-                if openssl version | grep -q '0[.]9[.]7'; then
+                if ${x509OPENSSL} version | grep -q '0[.]9[.]7'; then
                     echo "Export without certificate unsupported with this version of OpenSSL, try --with-cert" >&2
                     return 1
                 fi
                 options=("${options[@]}" -nocerts)
             fi
-            openssl pkcs12 ${options[@]}
+            ${x509OPENSSL} pkcs12 ${options[@]}
             if [[ $? -ne 0 ]]; then
                 echo "Key export failed" >&2
                 return 1
@@ -2300,7 +2313,7 @@ x509Key() {
         echo "$kAlias/$x509PKCS12"
     elif [[ $pkcs8 == "true" ]]; then
         if [[ ! -e $kAlias/$x509PKCS8KEY ]]; then
-            openssl pkcs8 -topk8 -in "$kAlias/$x509PKEY" -nocrypt \
+            ${x509OPENSSL} pkcs8 -topk8 -in "$kAlias/$x509PKEY" -nocrypt \
                 -out "$kAlias/$x509PKCS8KEY"
         fi
         echo "$kAlias/$x509PKCS8KEY"
@@ -2408,7 +2421,8 @@ x509Cert() {
 
     if [[ $der == "true" ]]; then
         if [[ ! -e $kAlias/$x509DERCERT ]]; then
-            openssl x509 -in "$kAlias/$x509CERT" -outform DER -out "$kAlias/$x509DERCERT"
+            ${x509OPENSSL} x509 -in "$kAlias/$x509CERT" -outform DER \
+                -out "$kAlias/$x509DERCERT"
             if [ $? -ne 0 ]; then
                 echo "File conversion failed" >&2
                 return 1
@@ -2424,7 +2438,7 @@ x509Cert() {
 
             # Old OpenSSL versions don't support lack of encryption on
             # certificate, use the weakest supported by current (2015) FIPS
-            if openssl version | grep -q '0[.]9[.]7'; then
+            if ${x509OPENSSL} version | grep -q '0[.]9[.]7'; then
                 options=(${options[@]} -certpbe PBE-SHA1-3DES)
             else
                 options=(${options[@]} -certpbe NONE)
@@ -2433,18 +2447,18 @@ x509Cert() {
             # note that NSS doesn't support MACs other that MD5 and SHA1
             # see RHBZ#1220573
             # older version of openssl don't support setting MAC at all
-            if openssl version | grep -q '0[.]9[.].'; then
+            if ${x509OPENSSL} version | grep -q '0[.]9[.].'; then
                 :
             else
                 options=(${options[@]} -macalg SHA1)
             fi
 
             local ret
-            openssl pkcs12 "${options[@]}"
+            ${x509OPENSSL} pkcs12 "${options[@]}"
             ret=$?
 
             # old openssl has broken return codes...
-            if ! openssl version | grep -q '0[.]9[.]7'; then
+            if ! ${x509OPENSSL} version | grep -q '0[.]9[.]7'; then
                 if [ $ret -ne 0 ]; then
                     echo "File conversion failed" >&2
                     return 1
@@ -2487,7 +2501,7 @@ Specify the name of the certificate to dump
 
 x509DumpCert(){
 
-    openssl x509 -in $(x509Cert "$1") -noout -text
+    ${x509OPENSSL} x509 -in $(x509Cert "$1") -noout -text
 }
 
 true <<'=cut'
