@@ -582,32 +582,32 @@ _ncGet () { # helper function for extracting nameConstraints from certificates
         # complex scenario
         rlRun "x509KeyGen rootca"
         options=(
-            '--ncPermit' 'example.com'
-            '--ncExclude' 'bad.example.com'
-            '--ncExclude' 'worse.example.com'
+            '--ncPermit' 'DNS:example.com'
+            '--ncExclude' 'DNS:bad.example.com'
+            '--ncExclude' 'DNS:worse.example.com'
             )
         rlRun "x509SelfSign ${options[*]} rootca"
         rlRun -s "x509DumpCert rootca |sed -n '/Permitted:/,/Excluded/ p'"
-        rlAssertGrep "DNS:example.com" "$rlRun_LOG"
+        rlAssertGrep "^[[:space:]]*DNS:example.com" "$rlRun_LOG"
         rm -f "$rlRun_LOG"
         rlRun -s "x509DumpCert rootca |sed -n '/Excluded:/,/Signature/ p'"
-        rlAssertGrep "DNS:bad.example.com" "$rlRun_LOG"
-        rlAssertGrep "DNS:worse.example.com" "$rlRun_LOG"
+        rlAssertGrep "^[[:space:]]*DNS:bad.example.com" "$rlRun_LOG"
+        rlAssertGrep "^[[:space:]]*DNS:worse.example.com" "$rlRun_LOG"
         rm -f "$rlRun_LOG"
         rlRun "x509KeyGen interca"
         options=(
             '--CA' 'rootca'
             '-t' 'ca'
             '--subjectAltName' 'DNS.1=ca.sub.example.com'
-            '--ncPermit' 'sub.example.com'
-            '--ncExclude' 'bad.sub.example.com'
+            '--ncPermit' 'DNS:sub.example.com'
+            '--ncExclude' 'DNS:bad.sub.example.com'
             )
         rlRun "x509CertSign ${options[*]} interca"
         rlRun -s "x509DumpCert interca |sed -n '/Permitted:/,/Excluded/ p'"
-        rlAssertGrep "DNS:sub.example.com" "$rlRun_LOG"
+        rlAssertGrep "^[[:space:]]*DNS:sub.example.com" "$rlRun_LOG"
         rm -f "$rlRun_LOG"
         rlRun -s "x509DumpCert interca |sed -n '/Excluded:/,/Signature/ p'"
-        rlAssertGrep "DNS:bad.sub.example.com" "$rlRun_LOG"
+        rlAssertGrep "^[[:space:]]*DNS:bad.sub.example.com" "$rlRun_LOG"
         rm -f "$rlRun_LOG"
         rlRun "x509KeyGen server"
         for t in www.sub.example.com:0 bad.example.com:2 bad.sub.example.com:2; do

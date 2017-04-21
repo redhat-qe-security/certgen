@@ -422,7 +422,7 @@ EOF
 __INTERNAL_x509NameToConstraint() {
     local name="$1"
     local result=""
-    if echo "$name" | grep -q '[A-Z]+:.+'; then
+    if echo "$name" | grep -q '[A-Z]\+:.\+'; then
         result="$name"
     elif echo "$name" | grep -q '^([0-9]{1,3}\.){3}[0-9]{1,3}$'; then
         result="IP:$name/255.255.255.255"
