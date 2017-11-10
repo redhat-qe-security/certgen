@@ -303,6 +303,18 @@ rlJournalStart
             rlRun "x509RmAlias ca"
             rlRun "x509RmAlias server"
             rlRun "x509RmAlias server-salt"
+
+            rlLogInfo "Mismatched signature hash and MGF1 hash"
+            rlRun "x509KeyGen -t rsa ca"
+            rlRun "x509KeyGen -t rsa server"
+            rlRun "x509SelfSign --padding pss ca"
+            rlRun "x509CertSign --CA ca --padding pss --md sha256 --pssMgf1Md sha384 server"
+            rlRun -s "x509DumpCert server"
+            rlAssertGrep "Signature Algorithm: rsassaPss" $rlRun_LOG
+            rlAssertGrep "Mask Algorithm: mgf1 with sha384" $rlRun_LOG
+            rlAssertGrep "Hash Algorithm: sha256" $rlRun_LOG
+            rlRun "x509RmAlias ca"
+            rlRun "x509RmAlias server"
         rlPhaseEnd
     fi
 

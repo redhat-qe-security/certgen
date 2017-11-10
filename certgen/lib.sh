@@ -761,6 +761,7 @@ B<x509SelfSign>
 [B<--md> I<HASH>]
 [B<--padding> I<PADDING>]
 [B<--pssSaltLen> I<SALTLEN>]
+[B<--pssMgf1Md> I<MD>]
 [B<--noAuthKeyId>]
 [B<--noBasicConstraints>]
 [B<--noSubjKeyId>]
@@ -1644,6 +1645,11 @@ signature. Special values are: B<-1> for setting the salt size to the size
 of used message digest, B<-2> for automatically determining the size of
 the salt and B<-3> for using the maximum possible salt size.
 
+=item B<--pssMgf1Md> I<MD>
+
+Set the hash used for the MGF1 inside RSA-PSS signatures.
+By default it's the same value that is used for B<--md> option.
+
 =item B<--noAuthKeyId>
 
 Do not add the Authority Key Identifier extension to generated certificates.
@@ -1799,6 +1805,8 @@ x509CertSign() {
     local sigPad=""
     # set the length of the salt used with RSA-PSS signatures
     local pssSaltLen=""
+    # set the mgf1 message digest for RSA-PSS signatures
+    local pssMgf1Md=""
     # sets the Basic Key Usage
     local basicKeyUsage=""
     # distinguished name of the signed certificate
@@ -1838,6 +1846,7 @@ x509CertSign() {
         -l md: \
         -l padding: \
         -l pssSaltLen: \
+        -l pssMgf1Md: \
         -l subjectAltName: \
         -l subjectAltNameCritical \
         -l ocspResponderURI: \
@@ -1890,6 +1899,8 @@ x509CertSign() {
             --padding) sigPad="$2"; shift 2
                 ;;
             --pssSaltLen) pssSaltLen="$2"; shift 2
+                ;;
+            --pssMgf1Md) pssMgf1Md="$2"; shift 2
                 ;;
             --subjectAltName) subjectAltName=("${subjectAltName[@]}" "$2"); shift 2
                 ;;
@@ -1970,7 +1981,13 @@ x509CertSign() {
     if [[ "$sigPad" && "$sigPad" != "pss" && "$pssSaltLen" ]] \
         || [[ -z "$sigPad" && "$pssSaltLen" ]]; then
 
-        echo "x509SelfSign: pssSaltLen is only applicable to pss padding" >&2
+        echo "x509CertSign: pssSaltLen is only applicable to pss padding" >&2
+        return 1
+    fi
+    if [[ "$sigPad" && "$sigPad" != "pss" && "$pssMgf1Md" ]] \
+        || [[ -z "$sigPad" && "$pssMgf1Md" ]]; then
+
+        echo "x509CertSign: pssMgf1Md is only applicable to pss padding" >&2
         return 1
     fi
 
@@ -2141,6 +2158,9 @@ x509CertSign() {
     fi
     if [[ ! -z $pssSaltLen ]]; then
         caOptions=("${caOptions[@]}" "-sigopt" "rsa_pss_saltlen:$pssSaltLen")
+    fi
+    if [[ ! -z $pssMgf1Md ]]; then
+        caOptions=("${caOptions[@]}" "-sigopt" "rsa_mgf1_md:$pssMgf1Md")
     fi
 
     ${x509OPENSSL} ca -config "$caAlias/$x509CACNF" -batch \
