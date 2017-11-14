@@ -333,17 +333,20 @@ rlJournalStart
             rlRun "x509RmAlias server"
             rlRun "x509RmAlias server-salt"
 
-            rlLogInfo "Mismatched signature hash and MGF1 hash"
-            rlRun "x509KeyGen -t rsa ca"
-            rlRun "x509KeyGen -t rsa server"
-            rlRun "x509SelfSign --padding pss ca"
-            rlRun "x509CertSign --CA ca --padding pss --md sha256 --pssMgf1Md sha384 server"
-            rlRun -s "x509DumpCert server"
-            rlAssertGrep "Signature Algorithm: rsassaPss" $rlRun_LOG
-            rlAssertGrep "Mask Algorithm: mgf1 with sha384" $rlRun_LOG
-            rlAssertGrep "Hash Algorithm: sha256" $rlRun_LOG
-            rlRun "x509RmAlias ca"
-            rlRun "x509RmAlias server"
+            # OpenSSL 1.0.1 doesn't have a full support for RSA-PSS
+            if ! rlIsRHEL '<7'; then
+                rlLogInfo "Mismatched signature hash and MGF1 hash"
+                rlRun "x509KeyGen -t rsa ca"
+                rlRun "x509KeyGen -t rsa server"
+                rlRun "x509SelfSign --padding pss ca"
+                rlRun "x509CertSign --CA ca --padding pss --md sha256 --pssMgf1Md sha384 server"
+                rlRun -s "x509DumpCert server"
+                rlAssertGrep "Signature Algorithm: rsassaPss" $rlRun_LOG
+                rlAssertGrep "Mask Algorithm: mgf1 with sha384" $rlRun_LOG
+                rlAssertGrep "Hash Algorithm: sha256" $rlRun_LOG
+                rlRun "x509RmAlias ca"
+                rlRun "x509RmAlias server"
+            fi
         rlPhaseEnd
     fi
 
