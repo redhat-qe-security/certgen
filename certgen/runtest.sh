@@ -694,6 +694,7 @@ _ncGet () { # helper function for extracting nameConstraints from certificates
             options=(
                 '--CA' 'interca'
                 '--subjectAltName' "DNS.1=$server"
+                '--DN' "CN=$server"
                 '--noAuthKeyId'
                 )
             rlRun "x509CertSign ${options[*]} server"
