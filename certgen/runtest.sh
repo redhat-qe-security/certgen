@@ -552,6 +552,8 @@ rlJournalStart
         rlRun "x509RmAlias ca"
     rlPhaseEnd
 
+    # named constraints are not supported with RHEL-4 openssl
+    if ! rlIsRHEL '<4'; then
     rlPhaseStartTest "nameConstraints"
 _ncGet () { # helper function for extracting nameConstraints from certificates
     which=$1
@@ -669,6 +671,7 @@ _ncGet () { # helper function for extracting nameConstraints from certificates
         rlRun "x509RmAlias interca"
         rlRun "x509RmAlias server"
     rlPhaseEnd
+    fi
 
     rlPhaseStartCleanup
         rlRun "popd"
