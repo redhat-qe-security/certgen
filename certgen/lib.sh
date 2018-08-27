@@ -313,7 +313,8 @@ __INTERNAL_x509GenConfig() {
     # generate config
     #
 
-    touch $kAlias/$x509CAINDEX
+    touch "$kAlias/$x509CAINDEX"
+    echo "unique_subject = no" >> "$kAlias/$x509CAINDEX.attr"
     if [ ! -e $kAlias/$x509CASERIAL ]; then
         echo $x509FIRSTSERIAL > $kAlias/$x509CASERIAL
     fi
