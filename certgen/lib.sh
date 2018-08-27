@@ -302,6 +302,14 @@ __INTERNAL_x509GenConfig() {
     fi
 
     #
+    # for Ed25519 we can't specify a hash as it is built-in
+    #
+    if ${x509OPENSSL} pkey -in "$kAlias/$x509PKEY" -noout -text | grep -qE '^(ED25519|ED448)'; then
+        md="null"
+    fi
+
+
+    #
     # generate config
     #
 
@@ -622,7 +630,8 @@ x509KeyGen() {
         return 1
     fi
     if [[ $kType != "RSA" ]] && [[ $kType != "DSA" ]] \
-        && [[ $kType != "ECDSA" ]] && [[ $kType != "RSA-PSS" ]]; then
+        && [[ $kType != "ECDSA" ]] && [[ $kType != "RSA-PSS" ]] \
+        && [[ $kType != "ED25519" ]] && [[ $kType != "ED448" ]]; then
 
         echo "x509KeyGen: Unknown key type: $kType" >&2
         return 1
@@ -1256,7 +1265,7 @@ x509SelfSign() {
         parameters=("${parameters[@]}" "--x509v3Extension=nameConstraints=$ncCritical$nameConstraints")
     fi
 
-    if [[ ! -z $certMD ]]; then
+    if [[ -n $certMD ]]; then
         parameters=("${parameters[@]}" "--md=$certMD")
     fi
 
@@ -2095,7 +2104,7 @@ x509CertSign() {
         parameters=("${parameters[@]}" "--x509v3Extension=nameConstraints=$ncCritical$nameConstraints")
     fi
 
-    if [[ ! -z $certMD ]]; then
+    if [[ -n $certMD ]]; then
         parameters=("${parameters[@]}" "--md=$certMD")
     fi
 

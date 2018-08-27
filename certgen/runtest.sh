@@ -168,6 +168,34 @@ rlJournalStart
         rlPhaseEnd
     fi
 
+    if ! rlIsRHEL '<8'; then
+        rlPhaseStartTest "EdDSA ed25519 support"
+            rlRun "x509KeyGen -t ed25519 ca"
+            rlRun "x509KeyGen -t ed25519 server"
+            rlRun "x509SelfSign ca"
+            rlRun "x509CertSign --CA ca server"
+            rlAssertExists "$(x509Cert server)"
+            rlRun -s "x509DumpCert server"
+            rlAssertGrep "Signature Algorithm: ED25519" "$rlRun_LOG"
+            rlRun "rm '$rlRun_LOG'"
+            rlRun "x509RmAlias ca"
+            rlRun "x509RmAlias server"
+        rlPhaseEnd
+
+        rlPhaseStartTest "EdDSA ed448 support"
+            rlRun "x509KeyGen -t ed448 ca"
+            rlRun "x509KeyGen -t ed448 server"
+            rlRun "x509SelfSign ca"
+            rlRun "x509CertSign --CA ca server"
+            rlAssertExists "$(x509Cert server)"
+            rlRun -s "x509DumpCert server"
+            rlAssertGrep "Signature Algorithm: ED448" "$rlRun_LOG"
+            rlRun "rm '$rlRun_LOG'"
+            rlRun "x509RmAlias ca"
+            rlRun "x509RmAlias server"
+        rlPhaseEnd
+    fi
+
     rlPhaseStartTest "DSA support"
         rlRun "x509KeyGen -t dsa ca"
         rlRun "x509KeyGen -t dsa server"
