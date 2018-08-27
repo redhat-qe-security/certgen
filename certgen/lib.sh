@@ -304,7 +304,7 @@ __INTERNAL_x509GenConfig() {
     #
     # for Ed25519 we can't specify a hash as it is built-in
     #
-    if ${x509OPENSSL} pkey -in "$kAlias/$x509PKEY" -noout -text | grep -qE '^(ED25519|ED448)'; then
+    if ${x509OPENSSL} pkey -in "$kAlias/$x509PKEY" -noout -text 2> /dev/null | grep -qE '^(ED25519|ED448)'; then
         md="null"
     fi
 
