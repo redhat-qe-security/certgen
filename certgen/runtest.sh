@@ -553,7 +553,7 @@ rlJournalStart
     rlPhaseEnd
 
     # named constraints are not supported with RHEL-4 openssl
-    if ! rlIsRHEL '<4'; then
+    if ! rlIsRHEL '<5'; then
     rlPhaseStartTest "nameConstraints"
 _ncGet () { # helper function for extracting nameConstraints from certificates
     which=$1
