@@ -493,10 +493,13 @@ rlJournalStart
         rlAssertGrep "OCSP No Check" "$rlRun_LOG"
         rlAssertNotGrep "OCSP No Check: critical" "$rlRun_LOG"
         rlRun "rm $rlRun_LOG"
-        rlRun "x509CertSign --CA ca --ocspNoCheck=critical server2"
-        rlRun -s "x509DumpCert server2"
-        rlAssertGrep "OCSP No Check: critical" "$rlRun_LOG"
-        rlRun "rm $rlRun_LOG"
+        # "critical" flag doesn't work on RHEL-4
+        if ! rlIsRHEL '<5'; then
+            rlRun "x509CertSign --CA ca --ocspNoCheck=critical server2"
+            rlRun -s "x509DumpCert server2"
+            rlAssertGrep "OCSP No Check: critical" "$rlRun_LOG"
+            rlRun "rm $rlRun_LOG"
+        fi
         rlRun "x509RmAlias ca"
         rlRun "x509RmAlias server"
         rlRun "x509RmAlias server2"
