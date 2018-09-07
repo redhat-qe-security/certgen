@@ -308,6 +308,11 @@ __INTERNAL_x509GenConfig() {
         md="null"
     fi
 
+    # in openssl 1.1.1 the oid was renamed to uppercase and the
+    # lower case stopped working, so fix it
+    if ! ${x509OPENSSL} version | grep -Eq '0[.]9[.]|1[.]0[.]'; then
+        extendedKeyUsage="${extendedKeyUsage/ocspSigning/OCSPSigning}"
+    fi
 
     #
     # generate config

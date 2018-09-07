@@ -469,7 +469,7 @@ rlJournalStart
         rlRun "x509RmAlias server"
     rlPhaseEnd
 
-    rlPhaseStartTest "Extended Key Usage"
+    rlPhaseStartTest "Extended Key Usage - timeStamping"
         rlRun "x509KeyGen ca"
         rlRun "x509KeyGen server"
         rlRun "x509SelfSign ca"
@@ -477,6 +477,34 @@ rlJournalStart
         rlRun -s "x509DumpCert server"
         rlAssertGrep "Extended Key Usage:.*critical" "$rlRun_LOG"
         rlAssertGrep "Time Stamping" "$rlRun_LOG"
+        rlAssertNotGrep "Web Server Authentication" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "Extended Key Usage - ocspSigning"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca --basicKeyUsage critical,digitalSignature,nonRepudiation --extendedKeyUsage critical,ocspSigning server"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "Extended Key Usage:.*critical" "$rlRun_LOG"
+        rlAssertGrep "OCSP Signing" "$rlRun_LOG"
+        rlAssertNotGrep "Web Server Authentication" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "Extended Key Usage - OCSPSigning - upper case"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca --basicKeyUsage critical,digitalSignature,nonRepudiation --extendedKeyUsage critical,OCSPSigning server"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "Extended Key Usage:.*critical" "$rlRun_LOG"
+        rlAssertGrep "OCSP Signing" "$rlRun_LOG"
         rlAssertNotGrep "Web Server Authentication" "$rlRun_LOG"
         rlRun "rm $rlRun_LOG"
         rlRun "x509RmAlias ca"
