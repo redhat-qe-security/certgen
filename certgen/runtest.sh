@@ -168,7 +168,8 @@ rlJournalStart
         rlPhaseEnd
     fi
 
-    if ! rlIsRHEL '<8'; then
+    # run only on RHEL-8 in normal mode
+    if ! rlIsRHEL '<8' && [[ -z $OPENSSL_ENFORCE_MODULUS_BITS ]]; then
         rlPhaseStartTest "EdDSA ed25519 support"
             rlRun "x509KeyGen -t ed25519 ca"
             rlRun "x509KeyGen -t ed25519 server"
