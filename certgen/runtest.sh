@@ -33,6 +33,7 @@ PACKAGE="openssl"
 
 rlJournalStart
     rlPhaseStartSetup
+        rlAssertRpm $PACKAGE
         rlRun "rlImport openssl/certgen"
         . ./lib.sh
         rlRun "TmpDir=\$(mktemp -d)" 0 "Creating tmp directory"
@@ -333,8 +334,8 @@ rlJournalStart
             rlRun "x509RmAlias server"
             rlRun "x509RmAlias server-salt"
 
-            # OpenSSL 1.0.1 doesn't have a full support for RSA-PSS
-            if ! rlIsRHEL '<7'; then
+            # OpenSSL 1.0.1 and earlier doesn't have full support for RSA-PSS
+            if ! rlIsRHEL '<8' || (rlIsRHEL 7 && rlIsRHEL '>=7.4'); then
                 rlLogInfo "Mismatched signature hash and MGF1 hash"
                 rlRun "x509KeyGen -t rsa ca"
                 rlRun "x509KeyGen -t rsa server"
