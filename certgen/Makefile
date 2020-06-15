@@ -56,6 +56,7 @@ $(METADATA): Makefile
 	@echo "RunFor:          openssl" >> $(METADATA)
 	@echo "Requires:        openssl" >> $(METADATA)
 	@echo "Provides:        library(openssl/certgen)" >> $(METADATA)
+	@echo "RhtsRequires:    openssl" >> $(METADATA)
 	@echo "Priority:        Normal" >> $(METADATA)
 	@echo "License:         GPLv2" >> $(METADATA)
 	@echo "Confidential:    no" >> $(METADATA)
