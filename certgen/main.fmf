@@ -1,0 +1,21 @@
+summary: Library for creating X.509 certificates for any use
+contact: Hubert Kario <hkario@redhat.com>
+component:
+- openssl
+test: ./runtest.sh
+require:
+- openssl
+recommend:
+- openssl
+duration: 45m
+enabled: true
+tag:
+- CI-Tier-1
+- Tier1
+- Tier1security
+tier: '1'
+relevancy: |
+    distro = rhel-3: False
+extra-summary: '[x509] Library for easy generation of complex certificates (openssl/certgen)'
+extra-task: /CoreOS/openssl/Library/certgen
+extra-nitrate: TC#0377821
