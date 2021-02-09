@@ -34,7 +34,7 @@ PACKAGE="openssl"
 rlJournalStart
     rlPhaseStartSetup
         rlAssertRpm $PACKAGE
-        rlRun "rlImport openssl/certgen"
+        rlRun "rlImport ./certgen"
         . ./lib.sh
         rlRun "TmpDir=\$(mktemp -d)" 0 "Creating tmp directory"
         rlRun "pushd $TmpDir"
