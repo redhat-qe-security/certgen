@@ -1327,6 +1327,10 @@ x509SelfSign() {
     if [[ ! -z "$pssSaltLen" ]]; then
         caOptions=("${caOptions[@]}" "-sigopt" "rsa_pss_saltlen:$pssSaltLen")
     fi
+    # the serial number must be the same, so reset index and serial number
+    rm -f "$kAlias/$x509CAINDEX" "$kAlias/$x509CASERIAL"
+    touch "$kAlias/$x509CAINDEX"
+    echo 01 > "$kAlias/$x509CASERIAL"
 
     # sign the certificate using the full CA functionality to get proper
     # key id and subject key identifier
