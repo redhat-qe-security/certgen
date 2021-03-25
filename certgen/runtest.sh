@@ -31,6 +31,8 @@
 
 PACKAGE="openssl"
 
+fips=$(cat /proc/sys/crypto/fips_enabled)
+
 rlJournalStart
     rlPhaseStartSetup
         rlAssertRpm $PACKAGE
@@ -38,6 +40,7 @@ rlJournalStart
         . ./lib.sh
         rlRun "TmpDir=\$(mktemp -d)" 0 "Creating tmp directory"
         rlRun "pushd $TmpDir"
+        rlLogInfo "fips=$fips"
     rlPhaseEnd
 
     rlPhaseStartTest "Sanity check"
@@ -170,7 +173,7 @@ rlJournalStart
     fi
 
     # run only on RHEL-8 in normal mode
-    if ! rlIsRHEL '<8' && [[ -z $OPENSSL_ENFORCE_MODULUS_BITS ]]; then
+    if ! rlIsRHEL '<8' && [[ $fips -eq 0 ]]; then
         rlPhaseStartTest "EdDSA ed25519 support"
             rlRun "x509KeyGen -t ed25519 ca"
             rlRun "x509KeyGen -t ed25519 server"
@@ -233,7 +236,7 @@ rlJournalStart
     rlPhaseEnd
 
     # don't run in strict FIPS mode
-    if [ ! $OPENSSL_ENFORCE_MODULUS_BITS ]; then
+    if [[ $fips -eq 0 ]]; then
     rlPhaseStartTest "DSA conservative values"
         rlRun "x509KeyGen -t dsa --conservative -s 1024 ca"
         rlRun "openssl dsa -in $(x509Key ca) -noout -text" 0,1 "Dump the key"
