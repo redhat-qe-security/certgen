@@ -964,9 +964,12 @@ By default C<5 years ago> for I<ca> role, C<now> for all others.
 
 =item B<-t> I<type>
 
-Sets the general type of certificate: C<CA>, C<webserver> or C<webclient>.
+Sets the general type of certificate: C<CA>, C<webserver>, C<webclient> or
+C<none>.
 In case there are no additional options, this also sets correct values
 for basic key usage and extended key usage for given role.
+The special value of C<none> removes use of basic key usage and extended key
+usage extensions.
 
 Note that while the names indicate "web", they actually apply for all servers
 and clients that use TLS or SSL and in case of C<webclient> also for S/MIME.
@@ -1134,7 +1137,7 @@ x509SelfSign() {
 
     certRole=$(tr '[:upper:]' '[:lower:]' <<< ${certRole})
     if [[ $certRole != "ca" ]] && [[ $certRole != "webserver" ]] \
-        && [[ $certRole != "webclient" ]]; then
+        && [[ $certRole != "webclient" ]] && [[ $certRole != "none" ]]; then
 
         echo "x509SelfSign: Unknown role: '$certRole'" >&2
         return 1
@@ -1164,6 +1167,8 @@ x509SelfSign() {
             webserver) certDN=("${certDN[@]}" "CN = localhost")
                 ;;
             webclient) certDN=("${certDN[@]}" "CN = John Smith")
+                ;;
+            none) certDN=("${certDN[@]}" "O = Unknown use cert")
                 ;;
             *) echo "x509SelfSign: Unknown cert role: $certRole" >&2
                 return 1
@@ -1225,6 +1230,8 @@ x509SelfSign() {
                 basicKeyUsage="${basicKeyUsage}keyEncipherment, keyAgreement"
                 ;;
             webclient) basicKeyUsage="digitalSignature, keyEncipherment"
+                ;;
+            none)
                 ;;
             *) echo "x509SelfSign: Unknown cert role: $certRole" >&2
                 return 1
@@ -1761,9 +1768,12 @@ Mark the Subject Alternative Name as critical.
 
 =item B<-t> I<TYPE>
 
-Sets the general type of certificate: C<CA>, C<webserver> or C<webclient>.
+Sets the general type of certificate: C<CA>, C<webserver>, C<webclient> or
+C<none>.
 In case there are no additional options, this also sets correct values
 for basic key usage and extended key usage for given role.
+For case of C<none> the default is to not add basic key usage or extended
+key usage extensions to the certificate.
 
 Note that while the names indicate "web", they actually apply for all servers
 and clients that use TLS or SSL and in case of C<webclient> also for S/MIME.
@@ -1977,7 +1987,7 @@ x509CertSign() {
 
     certRole=$(tr '[:upper:]' '[:lower:]' <<< ${certRole})
     if [[ $certRole != "ca" ]] && [[ $certRole != "webserver" ]] \
-        && [[ $certRole != "webclient" ]]; then
+        && [[ $certRole != "webclient" ]] && [[ $certRole != "none" ]]; then
 
         echo "x509SelfSign: Unknown role: '$certRole'" >&2
         return 1
@@ -1990,6 +2000,8 @@ x509CertSign() {
             webserver) certDN=("${certDN[@]}" "CN = localhost")
                 ;;
             webclient) certDN=("${certDN[@]}" "CN = John Smith")
+                ;;
+            none) certDN=("${certDN[@]}" "O = No role cert")
                 ;;
             *) echo "x509CertSign: Unknown cert role: $certRole" >&2
                 return 1
@@ -2063,6 +2075,8 @@ x509CertSign() {
                 basicKeyUsage="${basicKeyUsage}keyEncipherment, keyAgreement"
                 ;;
             webclient) basicKeyUsage="digitalSignature, keyEncipherment"
+                ;;
+            none)
                 ;;
             *) echo "x509SelfSign: Unknown cert role: $certRole" >&2
                 return 1

@@ -439,10 +439,31 @@ rlJournalStart
         rlAssertGrep "John Smith" "$rlRun_LOG"
         rlAssertGrep "TLS Web Client Authentication" "$rlRun_LOG"
         rlAssertNotGrep "TLS Web Server Authentication" "$rlRun_LOG"
+        rlRun "x509KeyGen none"
+        # type none - no extensions
+        rlRun "x509CertSign --CA subca -t none none"
+        rlAssertExists "$(x509Cert none)"
+        rlRun -s "x509DumpCert none"
+        rlAssertNotGrep "CA:TRUE" "$rlRun_LOG"
+        rlAssertNotGrep "Certificate Sign" "$rlRun_LOG"
+        rlAssertNotGrep "TLS Web Server Authentication" "$rlRun_LOG"
+        rlAssertNotGrep "TLS Web Client Authentication" "$rlRun_LOG"
+        rlAssertNotGrep "X509v3 Key Usage" "$rlRun_LOG"
+        rlAssertNotGrep "X509v3 Extended Key Usage" "$rlRun_LOG"
         rlRun "x509RmAlias ca"
         rlRun "x509RmAlias subca"
         rlRun "x509RmAlias server"
         rlRun "x509RmAlias client"
+        rlRun "x509RmAlias none"
+    rlPhaseEnd
+
+    rlPhaseStartTest "Self-signed certificate profile"
+        rlRun "x509KeyGen ca"
+        rlRun "x509SelfSign -t none ca"
+        rlRun -s "x509DumpCert ca"
+        rlAssertNotGrep "X509v3 Key Usage" "$rlRun_LOG"
+        rlAssertNotGrep "X509v3 Extended Key Usage" "$rlRun_LOG"
+        rlRun "x509RmAlias ca"
     rlPhaseEnd
 
     rlPhaseStartTest "Hash for signing"
