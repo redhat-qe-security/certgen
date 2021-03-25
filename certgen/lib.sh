@@ -1339,7 +1339,7 @@ x509SelfSign() {
         return 1
     fi
 
-    mv "$kAlias/$x509CERT" "$kAlias/temp-$x509CERT"
+    mv -f "$kAlias/$x509CERT" "$kAlias/temp-$x509CERT"
 
     # now we have a certificate with proper serial number, it's just missing
     # Authority Key Identifier that references it, so we sign itself for the
@@ -1348,7 +1348,7 @@ x509SelfSign() {
         parameters=("${parameters[@]}" "--authorityKeyIdentifier=keyid:always,issuer:always")
     fi
     # the serial number must be the same, so reset index and serial number
-    rm "$kAlias/$x509CAINDEX" "$kAlias/$x509CASERIAL"
+    rm -f "$kAlias/$x509CAINDEX" "$kAlias/$x509CASERIAL"
     __INTERNAL_x509GenConfig "${parameters[@]}" "$kAlias"
     if [ $? -ne 0 ]; then
         return 1
