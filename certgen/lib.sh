@@ -1356,7 +1356,7 @@ x509SelfSign() {
     # Authority Key Identifier that references it, so we sign itself for the
     # third time
     if [[ $noAuthKeyId != "true" ]]; then
-        parameters=("${parameters[@]}" "--authorityKeyIdentifier=keyid:always,issuer:always")
+        parameters=("${parameters[@]}" "--authorityKeyIdentifier=keyid,issuer")
     fi
     # the serial number must be the same, so reset index and serial number
     rm -f "$kAlias/$x509CAINDEX" "$kAlias/$x509CASERIAL"
@@ -2161,7 +2161,7 @@ x509CertSign() {
     fi
 
     if [[ $noAuthKeyId != "true" ]]; then
-        parameters=("${parameters[@]}" "--authorityKeyIdentifier=keyid:always,issuer:always")
+        parameters=("${parameters[@]}" "--authorityKeyIdentifier=keyid,issuer")
     fi
 
     __INTERNAL_x509GenConfig "${parameters[@]}" "$caAlias"
