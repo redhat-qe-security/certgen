@@ -360,19 +360,34 @@ rlJournalStart
             rlRun "x509KeyGen -t rsa-pss ca"
             rlRun -s "${x509OPENSSL} pkey -noout -text -in $(x509Key ca)"
             # check if private key has the RSA-PSS identifier
-            rlAssertGrep "RSA-PSS Private-Key" $rlRun_LOG
+            if ${x509OPENSSL} version | grep -Eq '1[.]1[.]1'; then
+                # OpenSSL 3.0.0 doesn't print the name
+                # but does print that there are no PSS restrictions, so we
+                # know that the key is RSA-PSS still
+                rlAssertGrep "RSA-PSS Private-Key" $rlRun_LOG
+            fi
             rlAssertGrep "No PSS parameter restrictions" $rlRun_LOG
             rlAssertGrep "2048 bit" $rlRun_LOG
             rlRun "x509RmAlias ca"
             # check if the command line options work
             rlRun "x509KeyGen -t rsa-pss -s 3072 --gen-opts rsa_pss_keygen_md:sha256 --gen-opts rsa_pss_keygen_saltlen:20 ca"
             rlRun -s "${x509OPENSSL} pkey -noout -text -in $(x509Key ca)"
-            rlAssertGrep "RSA-PSS Private-Key" $rlRun_LOG
+            if ${x509OPENSSL} version | grep -Eq '1[.]1[.]1'; then
+                # OpenSSL 3.0.0 doesn't print the type any more
+                rlAssertGrep "RSA-PSS Private-Key" $rlRun_LOG
+            fi
             rlAssertGrep "3072 bit" $rlRun_LOG
             rlAssertNotGrep "No PSS parameter restrictions" $rlRun_LOG
             rlAssertGrep "PSS parameter restrictions" $rlRun_LOG
-            rlAssertGrep "Hash Algorithm: sha256" $rlRun_LOG
-            rlAssertGrep "Minimum Salt Length: 0x14" $rlRun_LOG
+            if ${x509OPENSSL} version | grep -Eq '1[.]1[.]1'; then
+                rlAssertGrep "Hash Algorithm: sha256" $rlRun_LOG
+                rlAssertGrep "Minimum Salt Length: 0x14" $rlRun_LOG
+            else
+                # new OpenSSL calls the algorithm differently
+                rlAssertGrep "Hash Algorithm: SHA2-256" $rlRun_LOG
+                # and doesn't use hex encoding for the length
+                rlAssertGrep "Minimum Salt Length: 20" $rlRun_LOG
+            fi
             rlRun "x509SelfSign ca"
             rlRun -s "x509DumpCert ca"
             # verify the restrictions are transferred to certificate
