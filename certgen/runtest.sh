@@ -761,6 +761,57 @@ _ncGet () { # helper function for extracting nameConstraints from certificates
     rlPhaseEnd
     fi
 
+    rlPhaseStartTest "Certificate Revocation"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca server"
+        rlRun -s "x509Revoke --CA ca server"
+        rlAssertGrep "Revoking Certificate 02" "$rlRun_LOG"
+        rlRun -s "openssl ca -status 2 -config ca/$x509CACNF" 1
+        rlAssertGrep "02=Revoked" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "CRL reason"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca server"
+        rlRun "x509Revoke --CA ca --crlReason cessationOfOperation server"
+        rlAssertGrep '^R.*cessationOfOperation.*02.*$' "ca/$x509CAINDEX"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "CRL Compromise Time"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca server"
+        now="$(date +"%Y%m%d%H%M%S%z")"
+        rlRun "x509Revoke --CA ca --crlCompromiseTime $now server"
+        expected="^R.*keyTime,$now.*02.*$"
+        rlAssertGrep "$expected" "ca/$x509CAINDEX"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "CRL CA Compromise Time"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca server"
+        now="$(date +"%Y%m%d%H%M%S%z")"
+        rlRun "x509Revoke --CA ca --crlCACompromiseTime $now server"
+        expected="^R.*CAkeyTime,$now.*02.*$"
+        rlAssertGrep "$expected" "ca/$x509CAINDEX"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
     rlPhaseStartCleanup
         rlRun "popd"
         rlRun "rm -r $TmpDir" 0 "Removing tmp directory"

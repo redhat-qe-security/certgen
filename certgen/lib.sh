@@ -2632,6 +2632,180 @@ x509RmAlias() {
     fi
 }
 
+true <<'=cut'
+=pod
+
+=head2 x509Revoke()
+
+Revoke a certificate.
+
+=over 4
+
+B<x509Revoke>
+B<--CA> I<CAAlias>
+[B<--crlReason> I<REASON>]
+[B<--crlCompromiseTime> I<REASON>]
+[B<--crlCACompromiseTime> I<REASON>]
+I<alias>
+
+=back
+
+=over
+
+=item B<--CA> I<CAAlias>
+
+The CA alias which issued the certificate to be revoked.
+
+The specified CA must have issued the certificate to be revoked.
+
+=back
+
+=item B<--crlReason> I<REASON>
+
+The reason for the certificate to be revoked.
+
+Acceptable values are B<unspecified>, B<keyCompromise>, B<CACompromise>,
+B<affiliationChanged>, B<superseded>, B<cessationOfOperation>,
+B<certificateHold>, and <removeFromCRL>. The matching of reason is case
+insensitive. Setting any revocation reason will make the CRL v2.
+
+In practice removeFromCRL is not particularly useful because it is only used in
+delta CRLs which are not currently implemented.
+
+=back
+
+=item B<--crlCompromiseTime> I<TIME>
+
+This sets the revocation reason to B<keyCompromise> and the compromise time to
+I<TIME>.
+
+I<TIME> should be in GeneralizedTime format that is YYYYMMDDHHMMSSZ
+
+=back
+
+=item B<--crlCACompromiseTime> I<TIME>
+
+Same as B<--crlCompromiseTime> except the revocation reason is set to
+B<CACompromise>.
+
+=back
+
+=item I<alias>
+
+The alias for the certificate to be revoked.
+
+=back
+
+=cut
+
+x509Revoke() {
+    # alias of the certificate to be revoked
+    local kAlias
+    # alias of the certificate issuer CA key and cert to be used
+    local caAlias
+    # reason for certificate revocation
+    local crlReason
+    # set the compromise time and the reason for revocation
+    local crlCompromiseTime
+    # set the CA compromise time and the reason for revocation
+    local crlCACompromiseTime
+
+    local TEMP=$(getopt -o v:t: -l CA: \
+        -l crlReason: \
+        -l crlCompromiseTime: \
+        -l crlCACompromiseTime: \
+        -n x509Revoke -- "$@")
+
+    if [ $? -ne 0 ]; then
+        echo "x509Revoke: can't parse options" >&2
+        return 1
+    fi
+
+    eval set -- "$TEMP"
+
+    while true ; do
+        case "$1" in
+            --CA) caAlias="$2"; shift 2
+                ;;
+            --crlReason) crlReason="$2"; shift 2
+                ;;
+            --crlCompromiseTime) crlCompromiseTime="$2"; shift 2
+                ;;
+            --crlCACompromiseTime) crlCACompromiseTime="$2"; shift 2
+                ;;
+            --) shift 1
+                break
+                ;;
+            *) echo "x509Revoke: Unknown option: $1" >&2
+                return 1
+        esac
+    done
+
+    kAlias="$1"
+
+    #
+    # sanity check options
+    #
+
+    if [ ! -e "$caAlias/$x509PKEY" ]; then
+        echo "x509Revoke: CA private key does not exist" >&2
+        return 1
+    fi
+
+    if [ ! -e "$caAlias/$x509CERT" ]; then
+        echo "x509Revoke: CA certificate does not exist" >&2
+        return 1
+    fi
+
+    if [ ! -e "$caAlias/$x509CACNF" ]; then
+        echo "x509Revoke: CA configuration does not exist" >&2
+        return 1
+    fi
+
+    #
+    # set parameters
+    #
+
+    local isReasonSet=""
+    declare -a parameters
+
+    if [[ ! -z $crlReason ]]; then
+        parameters=("${parameters[@]}" "-crl_reason" "$crlReason")
+        isReasonSet="True"
+    fi
+
+    if [[ ! -z $crlCompromiseTime ]]; then
+        if [[ ! -z $isReasonSet ]]; then
+            echo "X509Revoke: crlReason, crlCompromiseTime, and "\
+                "crlCACompromiseTime are mutually exclusive; choose one" >&2
+            return 1
+        fi
+
+        parameters=("${parameters[@]}" "-crl_compromise" "$crlCompromiseTime")
+        isReasonSet="True"
+    fi
+
+    if [[ ! -z $crlCACompromiseTime ]]; then
+        if [[ ! -z $isReasonSet ]]; then
+            echo "X509Revoke: crlReason, crlCompromiseTime, and "\
+                "crlCACompromiseTime are mutually exclusive; choose one" >&2
+            return 1
+        fi
+        parameters=("${parameters[@]}" "-crl_CA_compromise" "$crlCACompromiseTime")
+        isReasonSet="True"
+    fi
+
+    ${x509OPENSSL} ca -config "$caAlias/$x509CACNF" -batch \
+        -keyfile "$caAlias/$x509PKEY" \
+        -cert "$caAlias/$x509CERT" \
+        -revoke "$kAlias/$x509CERT" \
+        "${parameters[@]}"
+    if [ $? -ne 0 ]; then
+        echo "x509Revoke: Failed to revoke certificate" >&2
+        return 1
+    fi
+}
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #   Execution
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
