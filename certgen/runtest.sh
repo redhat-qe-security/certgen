@@ -866,6 +866,19 @@ _ncGet () { # helper function for extracting nameConstraints from certificates
         rlRun "x509RmAlias ca"
     rlPhaseEnd
 
+    rlPhaseStartTest "CRL Distribution Points extension"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca --crlDistributionPoints https://crl.example.com server"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "CRL Distribution Points" "$rlRun_LOG"
+        rlAssertGrep "crl[.]example[.]com" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
     rlPhaseStartCleanup
         rlRun "popd"
         rlRun "rm -r $TmpDir" 0 "Removing tmp directory"

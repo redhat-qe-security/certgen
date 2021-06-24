@@ -208,6 +208,8 @@ __INTERNAL_x509GenConfig() {
     local basicKeyUsage=""
     # Basic Constraints to set
     local basicConstraints=""
+    # CRL distribution points URL
+    local crlDistributionPoints=""
     # value of the Subject Key Identifier extension
     local subjectKeyIdentifier=""
     # whatever to generate Authority Key Identifier extension
@@ -230,6 +232,7 @@ __INTERNAL_x509GenConfig() {
     local TEMP=$(getopt -o t: -l dn: -l md: -l notBefore: -l notAfter: \
         -l basicKeyUsage: \
         -l basicConstraints: \
+        -l crlDistributionPoints: \
         -l subjectKeyIdentifier \
         -l authorityKeyIdentifier: \
         -l subjectAltName: \
@@ -258,6 +261,8 @@ __INTERNAL_x509GenConfig() {
             --basicKeyUsage) basicKeyUsage="$2"; shift 2
                 ;;
             --basicConstraints) basicConstraints="$2"; shift 2
+                ;;
+            --crlDistributionPoints) crlDistributionPoints="$2"; shift 2
                 ;;
             --subjectKeyIdentifier) subjectKeyIdentifier="true"; shift 1
                 ;;
@@ -404,6 +409,10 @@ EOF
 
     if [[ ! -z $basicConstraints ]]; then
         echo "basicConstraints =$basicConstraints" >> "$kAlias/$x509CACNF"
+    fi
+
+    if [[ ! -z $crlDistributionPoints ]]; then
+        echo "crlDistributionPoints =URI:$crlDistributionPoints" >> "$kAlias/$x509CACNF"
     fi
 
     if [[ ! -z $basicKeyUsage ]]; then
@@ -1559,6 +1568,15 @@ B<--bcCritical>.
 
 This is the default for C<CA> role.
 
+=item B<--crlDistributionPoints> I<URI>
+
+Add the CRL Distributions Points extension that specifies the location of the
+Certificate Revocation List. The URI must be specified with protocol.
+
+For example:
+
+    http://crl.example.com/
+
 =item B<--DN> I<DNPART>
 
 Specifies parts of distinguished name (DN) of the generated certificate.
@@ -1833,6 +1851,8 @@ x509CertSign() {
     local certV="3"
     # role of certificate
     local certRole="webserver"
+    # CRL distribution URL
+    local crlDistributionPoints=""
     # date since which the cert is valid
     # default is in config generator (now)
     local notBefore=""
@@ -1889,6 +1909,7 @@ x509CertSign() {
         -l notBefore: \
         -l caTrue \
         -l caFalse \
+        -l crlDistributionPoints: \
         -l noBasicConstraints \
         -l bcPathLen: \
         -l bcCritical \
@@ -1932,6 +1953,8 @@ x509CertSign() {
             --caTrue) basicConstraints="CA:TRUE"; shift 1
                 ;;
             --caFalse) basicConstraints="CA:FALSE"; shift 1
+                ;;
+            --crlDistributionPoints) crlDistributionPoints="$2"; shift 2
                 ;;
             --noBasicConstraints) basicConstraints="undefined"; shift 1
                 ;;
@@ -2154,6 +2177,10 @@ x509CertSign() {
 
     if [[ -n $certMD ]]; then
         parameters=("${parameters[@]}" "--md=$certMD")
+    fi
+
+    if [[ ! -z $crlDistributionPoints ]]; then
+        parameters=("${parameters[@]}" "--crlDistributionPoints=${crlDistributionPoints}")
     fi
 
     for name in "${subjectAltName[@]}"; do
