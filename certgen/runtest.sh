@@ -812,6 +812,60 @@ _ncGet () { # helper function for extracting nameConstraints from certificates
         rlRun "x509RmAlias server"
     rlPhaseEnd
 
+    rlPhaseStartTest "Generate CRL"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun "x509CertSign --CA ca server"
+        rlRun -s "x509Revoke --CA ca server"
+        rlAssertGrep "Revoking Certificate 02" "$rlRun_LOG"
+        rlRun "x509GenerateCRL ca"
+        rlAssertExists "ca/$x509CRL"
+        rlRun -s "openssl crl -in ca/$x509CRL -text"
+        rlAssertGrep "Certificate Revocation List" "$rlRun_LOG"
+        rlAssertGrep "Revoked Certificates" "$rlRun_LOG"
+        rlAssertGrep "Serial Number: 02" "$rlRun_LOG"
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+        rlRun "x509RmAlias server"
+    rlPhaseEnd
+
+    rlPhaseStartTest "CRL next update days and hours"
+        rlRun "x509KeyGen ca"
+        rlRun "x509SelfSign ca"
+
+        # Set due date to 1 day from now
+        rlRun "x509GenerateCRL ca --crlDays 1"
+        rlAssertExists "ca/$x509CRL"
+        rlRun -s "openssl crl -in ca/$x509CRL -text"
+        rlAssertGrep "Certificate Revocation List" "$rlRun_LOG"
+        # calculate expected "next update"
+        last=$(grep "Last Update:" "$rlRun_LOG" |
+                     sed -E 's/^.*Last Update: //')
+        next=$(date -d "$(grep "Next Update:" "$rlRun_LOG" |
+                          sed -E 's/^.*Next Update: //')" +'%s')
+        expected=$(date -d "$last + 1 day" +"%s")
+        rlAssertEquals 'Check for expected next update' "$next" "$expected"
+
+        rlRun "rm $rlRun_LOG"
+
+        # Set due date to 1 hour from now
+        rlRun "x509GenerateCRL ca --crlHours 1"
+        rlAssertExists "ca/$x509CRL"
+        rlRun -s "openssl crl -in ca/$x509CRL -text"
+        rlAssertGrep "Certificate Revocation List" "$rlRun_LOG"
+        # calculate expected "next update"
+        last=$(grep "Last Update:" "$rlRun_LOG" |
+                     sed -E 's/Last Update: //')
+        next=$(date -d "$(grep "Next Update:" "$rlRun_LOG" |
+                          sed -E 's/^.*Next Update: //')" +'%s')
+        expected=$(date -d "$last + 1 hour" +"%s")
+        rlAssertEquals 'Check for expected next update' "$next" "$expected"
+
+        rlRun "rm $rlRun_LOG"
+        rlRun "x509RmAlias ca"
+    rlPhaseEnd
+
     rlPhaseStartCleanup
         rlRun "popd"
         rlRun "rm -r $TmpDir" 0 "Removing tmp directory"

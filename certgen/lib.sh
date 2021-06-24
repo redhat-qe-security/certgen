@@ -85,6 +85,15 @@ Name of the file with next available serial number. F<serial> by default.
 
 Name of file in which certificates will be placed. F<cert.pem> by default
 
+=item B<x509CRL>
+
+Name of file in which certificate revocation list will be placed. F<crl.pem> by
+default
+
+=item B<x509CRLNUMBER>
+
+Name of the file with next available CRL number. F<crlnumber> by default.
+
 =item B<x509CSR>
 
 Name of the file with certificate signing request. F<request.csr> by default.
@@ -100,6 +109,12 @@ B<x509Cert> function.
 Name of the file where private keys encoded in DER format will be placed.
 F<key.key> by default. Note that those file are generated on demand only by
 B<x509Key> function.
+
+=item B<x509FIRSTCRLNUMBER>
+
+The first CRL number that will be used when generating a CRL.
+Used when the CA generates a CRL. Must be a valid, nonegative hex number.
+C<01> by default.
 
 =item B<x509FIRSTSERIAL>
 
@@ -150,6 +165,8 @@ functions may cause the library to misbehave.
 x509PKEY=${x509PKEY:-key.pem}
 x509DERKEY=${x509DERKEY:-key.key}
 x509CERT=${x509CERT:-cert.pem}
+x509CRL=${x509CRL:-crl.pem}
+x509CRLNUMBER=${x509CRLNUMBER:-crlnumber}
 x509DERCERT=${x509DERCERT:-cert.crt}
 x509PKCS8KEY=${x509PKCS8KEY:-pkcs8.pem}
 x509PKCS8DERKEY=${x509PKCS8DERKEY:-pkcs8.key}
@@ -158,6 +175,7 @@ x509CSR=${x509CSR:-request.csr}
 x509CACNF=${x509CACNF:-ca.cnf}
 x509CAINDEX=${x509CAINDEX:-index.txt}
 x509CASERIAL=${x509CASERIAL:-serial}
+x509FIRSTCRLNUMBER=${x509FIRSTCRLNUMBER:-01}
 x509FIRSTSERIAL=${x509FIRSTSERIAL:-01}
 x509OPENSSL=${x509OPENSSL:-openssl}
 if ${x509OPENSSL} version | grep -q '0[.]9[.].'; then
@@ -324,6 +342,10 @@ __INTERNAL_x509GenConfig() {
         echo $x509FIRSTSERIAL > $kAlias/$x509CASERIAL
     fi
 
+    if [ ! -e $kAlias/$x509CRLNUMBER ]; then
+        echo $x509FIRSTCRLNUMBER > $kAlias/$x509CRLNUMBER
+    fi
+
     # OpenSSL 1.1.0 (? 1.1.1 definitely has) has the OID definition
     if ${x509OPENSSL} version | grep -Eq '0[.]9[.]|1[.]0[.]'; then
         cat > "$kAlias/$x509CACNF" <<EOF
@@ -342,6 +364,8 @@ EOF
 default_ca = ca_cnf
 
 [ ca_cnf ]
+crlnumber = $kAlias/$x509CRLNUMBER
+default_crl_days = 365
 default_md = $md
 default_startdate = $notBefore
 default_enddate   = $notAfter
@@ -2805,6 +2829,128 @@ x509Revoke() {
         return 1
     fi
 }
+
+true <<'=cut'
+=pod
+
+=head2 x509GenerateCRL()
+
+Generate and sign a Certificate Revocation List.
+
+=over 4
+
+B<x509GenerateCRL>
+[B<--crlDays>]
+[B<--crlHours>]
+I<CAAlias>
+
+=back
+
+=over
+
+=item B<--crlDays> I<number>
+
+The number of days before the next CRL is due (default is 365). That is the
+number of days from now to place in the CRL nextUpdate field.
+
+If both B<--crlDays> and B<--crlHours> are used together, the values are added (e.g.
+B<--crlDays> I<1> B<--crlHours> I<1> will result in 1 day and 1 hour from now)
+
+=back
+
+=item I<--crlHours> I<number>
+
+The number of hours before the next CRL is due. That is the number of hours from
+now to place in the CRL nextUpdate field.
+
+If both B<--crlDays> and B<--crlHours> are used together, the values are added (e.g.
+B<--crlDays> I<1> B<--crlHours> I<1> will result in 1 day and 1 hour from now)
+
+=back
+
+=item I<CAAlias>
+
+The CA alias whose Certicate Revocation List will be generated.
+
+=back
+
+=cut
+
+x509GenerateCRL() {
+    # alias of the certificate issuer CA key and cert to be used
+    local caAlias
+    # number of days before the next CRL is due
+    local crlDays=""
+    # number of hours before the next CRL is due
+    local crlHours=""
+
+    local TEMP=$(getopt -o v:t: \
+        -l crlDays: \
+        -l crlHours: \
+        -n x509GenerateCRL -- "$@")
+
+    if [ $? -ne 0 ]; then
+        echo "x509GenerateCRL: can't parse options" >&2
+        return 1
+    fi
+
+    eval set -- "$TEMP"
+
+    while true ; do
+        case "$1" in
+            --crlDays) crlDays="$2"; shift 2
+                ;;
+            --crlHours) crlHours="$2"; shift 2
+                ;;
+            --) shift 1
+                break
+                ;;
+            *) echo "x509GenerateCRL: Unknown option: $1" >&2
+                return 1
+        esac
+    done
+
+    caAlias="$1"
+
+    #
+    # sanity check options
+    #
+
+    if [ ! -e "$caAlias/$x509PKEY" ]; then
+        echo "x509GenerateCRL: CA private key does not exist" >&2
+        return 1
+    fi
+
+    if [ ! -e "$caAlias/$x509CERT" ]; then
+        echo "x509GenerateCRL: CA certificate does not exist" >&2
+        return 1
+    fi
+
+    if [ ! -e "$caAlias/$x509CACNF" ]; then
+        echo "x509GenerateCRL: CA configuration does not exist" >&2
+        return 1
+    fi
+
+    declare -a caOptions
+
+    if [[ ! -z "$crlDays" ]]; then
+        caOptions=("${caOptions[@]}" "-crldays" "$crlDays")
+    fi
+
+    if [[ ! -z "$crlHours" ]]; then
+        caOptions=("${caOptions[@]}" "-crlhours" "$crlHours")
+    fi
+
+    ${x509OPENSSL} ca -config "$caAlias/$x509CACNF" -batch \
+        -gencrl -keyfile "$caAlias/$x509PKEY" \
+        -cert "$caAlias/$x509CERT" \
+        -out "$caAlias/$x509CRL" "${caOptions[@]}"
+    if [ $? -ne 0 ]; then
+        echo "x509GenerateCRL: Failed to generate CRL" >&2
+        return 1
+    fi
+}
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #   Execution
