@@ -392,8 +392,15 @@ rlJournalStart
             rlRun -s "x509DumpCert ca"
             # verify the restrictions are transferred to certificate
             rlRun "grep -A3 'PSS parameter restrictions' $rlRun_LOG > restrictions.txt"
-            rlAssertGrep "Hash Algorithm: sha256" restrictions.txt
-            rlAssertGrep "Minimum Salt Length: 0x14" restrictions.txt
+            if ${x509OPENSSL} version | grep -Eq '1[.]1[.]1'; then
+                rlAssertGrep "Hash Algorithm: sha256" restrictions.txt
+                rlAssertGrep "Minimum Salt Length: 0x14" restrictions.txt
+            else
+                # new OpenSSL calls the algorithm differently
+                rlAssertGrep "Hash Algorithm: SHA2-256" restrictions.txt
+                # and doesn't use hex encoding for the length
+                rlAssertGrep "Minimum Salt Length: 20" restrictions.txt
+            fi
             rlRun "rm $rlRun_LOG restrictions.txt"
             # check if rsa-pss certificate automatically creates rsa-pss
             # signatures
@@ -403,7 +410,11 @@ rlJournalStart
             rlRun "x509KeyGen -t rsa-pss server"
             rlRun "x509CertSign --CA ca server"
             rlRun -s "x509DumpCert server"
-            rlAssertGrep "RSA-PSS Public-Key" $rlRun_LOG
+            if ${x509OPENSSL} version | grep -Eq '1[.]1[.]1'; then
+                rlAssertGrep "RSA-PSS Public-Key" $rlRun_LOG
+            else
+                rlAssertGrep "Public Key Algorithm: rsassaPss" $rlRun_LOG
+            fi
             rlAssertGrep "Hash Algorithm: sha256" $rlRun_LOG
             rlAssertGrep "Signature Algorithm: rsassaPss" $rlRun_LOG
             rlRun "rm $rlRun_LOG"
