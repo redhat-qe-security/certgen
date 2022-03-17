@@ -201,39 +201,42 @@ rlJournalStart
         rlPhaseEnd
     fi
 
-    rlPhaseStartTest "DSA support"
-        rlRun "x509KeyGen -t dsa ca"
-        rlRun "x509KeyGen -t dsa server"
-        rlRun "x509SelfSign ca"
-        rlRun "x509CertSign --CA ca server"
-        rlAssertExists "$(x509Cert server)"
-        rlAssertDiffer "$(x509Key server)" "$(x509Key server --der)"
-        rlAssertExists "$(x509Key server --der)"
-        a=$(openssl dsa -modulus -in $(x509Key server --der) -inform DER -noout)
-        b=$(openssl dsa -modulus -in $(x509Key server) -noout)
-        rlRun "[[ '$a' == '$b' ]]" 0 "Check if files have the same private key inside"
-        rlRun -s "x509DumpCert server"
-        rlAssertGrep "dsaEncryption" "$rlRun_LOG"
-        # DSA with SHA256 is unsupported with old OpenSSL (<1.0.0)
-        if rlIsRHEL 4 5; then
-            rlAssertGrep "dsaWithSHA1" "$rlRun_LOG"
-        else
-            rlAssertGrep "dsa_with_SHA256" "$rlRun_LOG"
-        fi
-        rlRun "rm '$rlRun_LOG'"
-        rlRun "x509RmAlias ca"
-        rlRun "x509RmAlias server"
-    rlPhaseEnd
+    # DSA is not supported on RHEL-9 in FIPS mode
+    if rlIsRHEL '<9' || [[ $fips -eq 0 ]]; then
+        rlPhaseStartTest "DSA support"
+            rlRun "x509KeyGen -t dsa ca"
+            rlRun "x509KeyGen -t dsa server"
+            rlRun "x509SelfSign ca"
+            rlRun "x509CertSign --CA ca server"
+            rlAssertExists "$(x509Cert server)"
+            rlAssertDiffer "$(x509Key server)" "$(x509Key server --der)"
+            rlAssertExists "$(x509Key server --der)"
+            a=$(openssl dsa -modulus -in $(x509Key server --der) -inform DER -noout)
+            b=$(openssl dsa -modulus -in $(x509Key server) -noout)
+            rlRun "[[ '$a' == '$b' ]]" 0 "Check if files have the same private key inside"
+            rlRun -s "x509DumpCert server"
+            rlAssertGrep "dsaEncryption" "$rlRun_LOG"
+            # DSA with SHA256 is unsupported with old OpenSSL (<1.0.0)
+            if rlIsRHEL 4 5; then
+                rlAssertGrep "dsaWithSHA1" "$rlRun_LOG"
+            else
+                rlAssertGrep "dsa_with_SHA256" "$rlRun_LOG"
+            fi
+            rlRun "rm '$rlRun_LOG'"
+            rlRun "x509RmAlias ca"
+            rlRun "x509RmAlias server"
+        rlPhaseEnd
 
-    rlPhaseStartTest "DSA param reuse"
-        rlRun "x509KeyGen -t dsa ca"
-        rlRun "x509KeyGen -t dsa --params ca server"
-        a=$(openssl dsa -in $(x509Key ca) -noout -text | grep -A 100 '^P:')
-        b=$(openssl dsa -in $(x509Key server) -noout -text | grep -A 100 '^P:')
-        rlRun "[[ '$a' == '$b' ]]" 0 "Check if parameters are the same"
-        rlRun "x509RmAlias ca"
-        rlRun "x509RmAlias server"
-    rlPhaseEnd
+        rlPhaseStartTest "DSA param reuse"
+            rlRun "x509KeyGen -t dsa ca"
+            rlRun "x509KeyGen -t dsa --params ca server"
+            a=$(openssl dsa -in $(x509Key ca) -noout -text | grep -A 100 '^P:')
+            b=$(openssl dsa -in $(x509Key server) -noout -text | grep -A 100 '^P:')
+            rlRun "[[ '$a' == '$b' ]]" 0 "Check if parameters are the same"
+            rlRun "x509RmAlias ca"
+            rlRun "x509RmAlias server"
+        rlPhaseEnd
+    fi
 
     # don't run in strict FIPS mode
     if [[ $fips -eq 0 ]]; then
@@ -268,7 +271,13 @@ rlJournalStart
 
     rlPhaseStartTest "PKCS8 key format"
         algos="rsa dsa ecdsa"
-        if rlIsRHEL '<6.5'; then algos="rsa dsa"; fi
+        if rlIsRHEL '<6.5'; then
+            algos="rsa dsa";
+        fi
+        if ( ! rlIsRHEL '<9' ) && [[ $fips -eq 1 ]]; then
+            # no DSA support on RHEL-9 in FIPS mode
+            algos="rsa ecdsa"
+        fi
         for algo in $algos; do
             bits_or_curves="2048 3072"
             if [[ $algo = "ecdsa" ]]; then
@@ -280,12 +289,12 @@ rlJournalStart
                 fi
             fi
             for bc in $bits_or_curves; do
-                x509KeyGen -t $algo -s $bc key
+                rlRun "x509KeyGen -t $algo -s $bc key"
                 rlAssertGrep "-----BEGIN PRIVATE KEY-----" $(x509Key --pkcs8 key)
                 rlAssertGrep "-----END PRIVATE KEY-----" $(x509Key --pkcs8 key)
                 rlRun "openssl pkcs8 -topk8 -in $(x509Key key) -out pkcs8.key -nocrypt"
                 rlRun "diff -u $(x509Key --pkcs8 key) pkcs8.key"
-                rm -rf pkcs8.key key/
+                rlRun "rm -rf pkcs8.key key/"
             done
         done
     rlPhaseEnd
