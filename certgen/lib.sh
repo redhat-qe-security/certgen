@@ -2347,7 +2347,9 @@ DER encoded file (binary, not base64).
 
 Convert a copy of the private key to PKCS#12 format and output the location
 of PKCS#12 encoded file. The key will be encrypted with null password and
-PKCS#5 v2 PBE/PBKDF and DES-EDE3-CBC cipher (strongest supported by NSS).
+PKCS#5 v2 PBE/PBKDF and DES-EDE3-CBC cipher (strongest supported by NSS)
+when using OpenSSL before 3.0 and with AES when using 3.0 (in practice
+it uses the default parameters in OpenSSL 3.0).
 Its friendly name will be set to alias.
 
 Note that the export does cache the last exported file, so if you exported the
@@ -2470,8 +2472,10 @@ x509Key() {
             # old OpenSSL doesn't support setting MAC at all
             if ${x509OPENSSL} version | grep -q '0[.]9[.].'; then
                 options=(${options[@]} -keypbe PBE-SHA1-3DES)
-            else
+            elif ${x509OPENSSL} version | grep -q '1[.][01][.]'; then
                 options=(${options[@]} -keypbe DES-EDE3-CBC -macalg SHA1)
+            # else # OpenSSL 3.0+
+            # use default (should be AES)
             fi
 
             if [[ $withCert == "true" ]]; then
@@ -2637,7 +2641,7 @@ x509Cert() {
             # older version of openssl don't support setting MAC at all
             if ${x509OPENSSL} version | grep -q '0[.]9[.].'; then
                 :
-            else
+            elif ${x509OPENSSL} version | grep -q '1[.][01][.]'; then
                 options=(${options[@]} -macalg SHA1)
             fi
 
