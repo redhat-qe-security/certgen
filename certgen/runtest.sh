@@ -425,6 +425,67 @@ rlJournalStart
         rlPhaseEnd
     fi
 
+    rlPhaseStartTest "Key Identifiers"
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign --noSubjKeyId ca"
+        rlRun -s "x509DumpCert ca"
+        rlAssertNotGrep "Subject Key Identifier" $rlRun_LOG
+        # for self-sign --noSubjKeyId implies --noAuthKeyId
+        rlAssertNotGrep "Authority Key Identifier" $rlRun_LOG
+        rlRun "x509CertSign --CA ca server"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "Subject Key Identifier" $rlRun_LOG
+        rlAssertGrep "Authority Key Identifier" $rlRun_LOG
+        # When the CA doesn't have a SPKI, the AKI can be specified as
+        # a combination of directory name and serial number
+        rlRun "grep -A3 'Authority Key Identifier' > selection.txt $rlRun_LOG"
+        rlAssertGrep "DirName" selection.txt -i
+        rlAssertGrep "serial" selection.txt -i
+        rlRun "rm selection.txt"
+
+        # see if we can control the SKI and AKI individually
+        rlRun "x509KeyGen server-two"
+        rlRun "x509CertSign --CA ca --noAuthKeyId server-two"
+        rlRun -s "x509DumpCert server-two"
+        rlAssertGrep "Subject Key Identifier" $rlRun_LOG
+        rlAssertNotGrep "Authority Key Identifier" $rlRun_LOG
+        rlRun "x509KeyGen server-three"
+        rlRun "x509CertSign --CA ca --noAuthKeyId --noSubjKeyId server-three"
+        rlRun -s "x509DumpCert server-three"
+        rlAssertNotGrep "Subject Key Identifier" $rlRun_LOG
+        rlAssertNotGrep "Authority Key Identifier" $rlRun_LOG
+        rlRun "x509KeyGen server-four"
+        rlRun "x509CertSign --CA ca --noSubjKeyId server-four"
+        rlRun -s "x509DumpCert server-four"
+        rlAssertNotGrep "Subject Key Identifier" $rlRun_LOG
+        rlAssertGrep "Authority Key Identifier" $rlRun_LOG
+        rlRun "x509RmAlias server-three"
+        rlRun "x509RmAlias server-two"
+        rlRun "x509RmAlias server"
+        rlRun "x509RmAlias ca"
+
+        # Test also with a CA that has the SPKI
+        rlRun "x509KeyGen ca"
+        rlRun "x509KeyGen server"
+        rlRun "x509SelfSign ca"
+        rlRun -s "x509DumpCert ca"
+        rlAssertGrep "Subject Key Identifier" $rlRun_LOG
+        rlAssertGrep "Authority Key Identifier" $rlRun_LOG
+        rlRun "x509CertSign --CA ca server"
+        rlRun -s "x509DumpCert server"
+        rlAssertGrep "Subject Key Identifier" $rlRun_LOG
+        rlAssertGrep "Authority Key Identifier" $rlRun_LOG
+        rlRun "x509KeyGen server-two"
+        rlRun "x509CertSign --CA ca --noAuthKeyId server-two"
+        rlRun -s "x509DumpCert server-two"
+        rlAssertGrep "Subject Key Identifier" $rlRun_LOG
+        rlAssertNotGrep "Authority Key Identifier" $rlRun_LOG
+        rlRun "x509RmAlias server-two"
+        rlRun "x509RmAlias server"
+        rlRun "x509RmAlias ca"
+    rlPhaseEnd
+
     rlPhaseStartTest "Certificate profiles"
         rlRun "x509KeyGen ca"
         rlRun "x509KeyGen subca"

@@ -233,7 +233,7 @@ __INTERNAL_x509GenConfig() {
         -l basicKeyUsage: \
         -l basicConstraints: \
         -l crlDistributionPoints: \
-        -l subjectKeyIdentifier \
+        -l subjectKeyIdentifier:: \
         -l authorityKeyIdentifier: \
         -l subjectAltName: \
         -l subjectAltNameCritical \
@@ -264,7 +264,16 @@ __INTERNAL_x509GenConfig() {
                 ;;
             --crlDistributionPoints) crlDistributionPoints="$2"; shift 2
                 ;;
-            --subjectKeyIdentifier) subjectKeyIdentifier="true"; shift 1
+            --subjectKeyIdentifier)
+                case "$2" in
+                    '')
+                        subjectKeyIdentifier="hash"
+                    ;;
+                    *)
+                        subjectKeyIdentifier="$2"
+                    ;;
+                esac
+                shift 2
                 ;;
             --authorityKeyIdentifier) authorityKeyIdentifier="$2"; shift 2
                 ;;
@@ -423,10 +432,20 @@ EOF
         echo "extendedKeyUsage =$extendedKeyUsage" >> "$kAlias/$x509CACNF"
     fi
 
+    # OpenSSL 3.0 and later requires an explicit "none" to not include SPKI
+    # but earlier versions (0.9.8, 1.0.x, 1.1.x) don't accept "none" as argument
+    if [[ -z $subjectKeyIdentifier ]] && ! $x509OPENSSL version | grep -qE '0[.]9[.]|1[.][01][.]'; then
+        echo "subjectKeyIdentifier=none" >> "$kAlias/$x509CACNF"
+    fi
     if [[ ! -z $subjectKeyIdentifier ]]; then
-        echo "subjectKeyIdentifier=hash" >> "$kAlias/$x509CACNF"
+        echo "subjectKeyIdentifier=$subjectKeyIdentifier" >> "$kAlias/$x509CACNF"
     fi
 
+    # OpenSSL 3.0 and later requires an explicit "none" to not include AKI
+    # but earlier versions (0.9.8, 1.0.x, 1.1.x) don't accept "none" as argument
+    if [[ -z $authorityKeyIdentifier ]] && ! $x509OPENSSL version | grep -qE '0[.]9[.]|1[.][01][.]'; then
+        echo "authorityKeyIdentifier=none" >> "$kAlias/$x509CACNF"
+    fi
     if [[ ! -z $authorityKeyIdentifier ]]; then
         echo "authorityKeyIdentifier=$authorityKeyIdentifier" >> "$kAlias/$x509CACNF"
     fi
@@ -813,6 +832,7 @@ B<x509SelfSign>
 [B<--noAuthKeyId>]
 [B<--noBasicConstraints>]
 [B<--noSubjKeyId>]
+[B<--subjectKeyIdentifier> I<[IDENTIFIER]>]
 [B<--notAfter> I<ENDDATE>]
 [B<--notBefore> I<STARTDATE>]
 [B<-t> I<type>]
@@ -926,7 +946,7 @@ Adds HOST to x509v3 nameConstraint as permitted (see RFC 5820).
 HOST can be a hostname (google.com), IP address (8.8.8.8),
 or something supported directly by openssl (IP:192.168.0.0/255.255.0.0,
 DNS:google.com - see man x509v3_config for details).
-    
+
 =item B<--ncExclude> I<HOST>
 
 Adds HOST to x509v3 nameConstraint as excluded (see RFC 5820).
@@ -975,6 +995,14 @@ Constraints will I<not> be considered to be a CA.
 
 Do not set the Subject Key Identifier extension in the certificate.
 Implies B<--noAuthKeyId>.
+
+=item B<--subjectKeyIdentifier> I<[IDENTIFIER]>
+
+Set the Subject Key Identifier extension in the certificate to the given value,
+if passed. If no value is passed, default to using the SHA-1 hash of the BIT
+STRING subjectPublicKey, i.e., OpenSSL's default. If provided, the value must be
+a hex string (possibly with : separating bytes) to use as the
+subjectKeyIdentifier.
 
 =item B<--notAfter> I<ENDDATE>
 
@@ -1071,6 +1099,8 @@ x509SelfSign() {
     # flag set when the Subject Key Identifier is not supposed to be added
     # to certificate
     local noSubjKeyId=""
+    # Explicit value to use as the Subject Key Identifier, if provided
+    local subjectKeyIdentifier=""
 
     #
     # parse options
@@ -1088,6 +1118,7 @@ x509SelfSign() {
         -l bcCritical \
         -l noAuthKeyId \
         -l noSubjKeyId \
+        -l subjectKeyIdentifier:: \
         -l md: \
         -l padding: \
         -l pssSaltLen: \
@@ -1140,6 +1171,8 @@ x509SelfSign() {
             --noAuthKeyId) noAuthKeyId="true"; shift 1
                 ;;
             --noSubjKeyId) noSubjKeyId="true"; shift 1
+                ;;
+            --subjectKeyIdentifier) subjectKeyIdentifier="$2"; shift 2
                 ;;
             --) shift 1
                 break
@@ -1276,6 +1309,11 @@ x509SelfSign() {
         noAuthKeyId="true"
     fi
 
+    if [[ $noSubjKeyId == "true" ]] && [ "$subjectKeyIdentifier" != "" ]; then
+        echo "x509SelfSign: --noSubjKeyId conflicts with --subjectKeyIdentifier" >&2
+        return 1
+    fi
+
     #
     # prepare configuration file for signing
     #
@@ -1316,7 +1354,11 @@ x509SelfSign() {
     fi
 
     if [[ $noSubjKeyId != "true" ]]; then
-        parameters=("${parameters[@]}" "--subjectKeyIdentifier")
+        if [ "$subjectKeyIdentifier" != "" ]; then
+            parameters=("${parameters[@]}" "--subjectKeyIdentifier=$subjectKeyIdentifier")
+        else
+            parameters=("${parameters[@]}" "--subjectKeyIdentifier")
+        fi
     fi
 
     __INTERNAL_x509GenConfig "${parameters[@]}" "$kAlias"
@@ -1515,6 +1557,8 @@ B<x509CertSign>
 [B<--ocspResponderURI> I<URI>]
 [B<--subjectAltName> I<ALTNAME>]
 [B<--subjectAltNameCritical>]
+[B<--noAuthKeyId>]
+[B<--noSubjKeyId>]
 [B<-t> I<TYPE>]
 [B<-v> I<version>]
 B<--CA> I<CAAlias>
