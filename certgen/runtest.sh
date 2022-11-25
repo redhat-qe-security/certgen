@@ -309,9 +309,18 @@ rlJournalStart
             rlRun -s "x509DumpCert ca"
             rlAssertGrep "Signature Algorithm: rsassaPss" $rlRun_LOG
             rlAssertGrep "Mask Algorithm: mgf1 with sha256" $rlRun_LOG
-            # maximum salt length in bytes for 2048 bit modulus and sha256 hash
-            # encoded as hex
-            rlAssertGrep "Salt Length: (0x|)DE" $rlRun_LOG -E
+            # in openssl on RHEL-8 and in openssl before 3.0.7, the automatic
+            # system selected maximum salt length for a given size.
+            # Because of compatibility with FIPS mode, it was changed to
+            # limit to the sie of the hash used
+            if rlIsRHEL '<9' || ( ( ! rlIsRHEL ) && ${x509OPENSSL} version | \
+                grep -Eq '1[.][01][.][012]|3[.]0[.][0123456]\>' ); then
+                # maximum salt length in bytes for 2048 bit modulus and sha256 hash
+                # encoded as hex
+                rlAssertGrep "Salt Length: (0x|)DE" $rlRun_LOG -E
+            else
+                rlAssertGrep "Salt Length: (0x|)20" $rlRun_LOG -E
+            fi
             rlRun "x509RmAlias ca"
 
             rlLogInfo "Default message digest with RSA-PSS and salt len equal to hash size"
@@ -330,7 +339,14 @@ rlJournalStart
             rlAssertGrep "Mask Algorithm: mgf1 with sha256" $rlRun_LOG
             # maximum salt length in bytes for 2048 bit modulus and sha256 hash
             # encoded as hex
-            rlAssertGrep "Salt Length: (0x|)DE" $rlRun_LOG -E
+            if rlIsRHEL '<9' || ${x509OPENSSL} version | \
+                grep -Eq '1[.][01][.][012]|3[.]0[.][0123456]\>'; then
+                # maximum salt length in bytes for 2048 bit modulus and sha256 hash
+                # encoded as hex
+                rlAssertGrep "Salt Length: (0x|)DE" $rlRun_LOG -E
+            else
+                rlAssertGrep "Salt Length: (0x|)20" $rlRun_LOG -E
+            fi
             rlRun "x509CertSign --CA ca --padding pss --pssSaltLen -1 server-salt"
             rlRun -s "x509DumpCert server-salt"
             rlAssertGrep "Signature Algorithm: rsassaPss" $rlRun_LOG
