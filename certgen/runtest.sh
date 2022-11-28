@@ -339,8 +339,8 @@ rlJournalStart
             rlAssertGrep "Mask Algorithm: mgf1 with sha256" $rlRun_LOG
             # maximum salt length in bytes for 2048 bit modulus and sha256 hash
             # encoded as hex
-            if rlIsRHEL '<9' || ${x509OPENSSL} version | \
-                grep -Eq '1[.][01][.][012]|3[.]0[.][0123456]\>'; then
+            if rlIsRHEL '<9' || ( ( ! rlIsRHEL ) && ${x509OPENSSL} version | \
+                grep -Eq '1[.][01][.][012]|3[.]0[.][0123456]\>' ); then
                 # maximum salt length in bytes for 2048 bit modulus and sha256 hash
                 # encoded as hex
                 rlAssertGrep "Salt Length: (0x|)DE" $rlRun_LOG -E
