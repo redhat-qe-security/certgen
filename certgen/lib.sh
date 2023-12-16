@@ -199,7 +199,7 @@ __INTERNAL_x509GenConfig() {
         local md="sha256"
     fi
     # current time in seconds from UNIX epoch
-    local now=$(date '+%s')
+    local now=$(env date '+%s')
     # date before which the certificate is not valid
     local notBefore=""
     # date after which the certificate is not valid
@@ -318,7 +318,7 @@ __INTERNAL_x509GenConfig() {
     if [ -z "$notBefore" ]; then
         notBefore="now"
     fi
-    notBefore=$(date -d "$notBefore" -u $x509FORMAT)
+    notBefore=$(env date -d "$notBefore" -u $x509FORMAT)
     if [ $? -ne 0 ]; then
         echo "x509GenConfig: notBefore date value is invalid" >&2
         return 1
@@ -327,7 +327,7 @@ __INTERNAL_x509GenConfig() {
     if [ -z "$notAfter" ]; then
         notAfter="1 year"
     fi
-    notAfter=$(date -d "$notAfter" -u $x509FORMAT)
+    notAfter=$(env date -d "$notAfter" -u $x509FORMAT)
     if [ $? -ne 0 ]; then
         echo "x509GenConfig: notAfter date value is invalid" >&2
         return 1
