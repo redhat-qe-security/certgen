@@ -2080,7 +2080,7 @@ x509CertSign() {
     if [[ $certRole != "ca" ]] && [[ $certRole != "webserver" ]] \
         && [[ $certRole != "webclient" ]] && [[ $certRole != "none" ]]; then
 
-        echo "x509SelfSign: Unknown role: '$certRole'" >&2
+        echo "x509CertSign: Unknown role: '$certRole'" >&2
         return 1
     fi
 
