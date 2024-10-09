@@ -9,6 +9,7 @@ require:
   - openssl
 recommend:
   - openssl
+  - oqsprovider
 duration: 45m
 enabled: true
 tag:

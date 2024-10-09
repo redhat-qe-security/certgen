@@ -54,7 +54,7 @@ $(METADATA): Makefile
 	@echo "Type:            Library" >> $(METADATA)
 	@echo "TestTime:        45m" >> $(METADATA)
 	@echo "RunFor:          openssl" >> $(METADATA)
-	@echo "Requires:        openssl" >> $(METADATA)
+	@echo "Requires:        openssl oqsprovider" >> $(METADATA)
 	@echo "Provides:        library(openssl/certgen)" >> $(METADATA)
 	@echo "RhtsRequires:    openssl" >> $(METADATA)
 	@echo "Priority:        Normal" >> $(METADATA)

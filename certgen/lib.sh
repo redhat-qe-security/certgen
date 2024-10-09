@@ -689,7 +689,9 @@ x509KeyGen() {
     fi
     if [[ $kType != "RSA" ]] && [[ $kType != "DSA" ]] \
         && [[ $kType != "ECDSA" ]] && [[ $kType != "RSA-PSS" ]] \
-        && [[ $kType != "ED25519" ]] && [[ $kType != "ED448" ]]; then
+        && [[ $kType != "ED25519" ]] && [[ $kType != "ED448" ]] \
+        && ! [[ $kType =~ MLDSA ]] && ! [[ $kType =~ SLHDSA ]] \
+        && ! [[ $kType =~ SPHINCS ]] ; then
 
         echo "x509KeyGen: Unknown key type: $kType" >&2
         return 1
@@ -785,6 +787,7 @@ x509KeyGen() {
         ${x509OPENSSL} genrsa -out "$kAlias/$x509PKEY" "$kSize"
         if [ $? -ne 0 ]; then
             echo "x509KeyGen: Key generation failed" >&2
+            return 1
         fi
     else # RSA-PSS, DH, GOST2001
         local options
@@ -800,6 +803,7 @@ x509KeyGen() {
         ${x509OPENSSL} genpkey "${options[@]}"
         if [ $? -ne 0 ]; then
             echo "x509KeyGen: Key generation failed" >&2
+            return 1
         fi
     fi
 
@@ -3040,6 +3044,11 @@ This library works correctly only when sourced. I.e.:
 
     . ./lib.sh
 
+or imported using rlImport inside the beakerlib, i.e. after running
+
+    . /usr/share/beakerlib/beakerlib.sh
+    rlRun "rlImport openssl/certgen"
+
 =over
 
 =back
@@ -3063,6 +3072,15 @@ x509LibraryLoaded() {
         echo "certgen: error: "\
             "Non GNU enhanced version of getopt" 1>&2
         return 1
+    fi
+
+    # Only since OpenSSL 3.2.0 there's ability to run post-quantum algorithms
+    if ! ${x509OPENSSL} version | grep -qE '0[.]9[.]|1[.][01][.]|3[.][01][.]'; then
+        if ${x509OPENSSL} list -providers | grep -q 'oqsprovider'; then
+            rlLogInfo "OQS Provider loaded, PQC available"
+        else
+            rlLogInfo "OQS Provider not available, Post-Quantum Cryptography (PQC) UNavailable"
+        fi
     fi
 
     return 0

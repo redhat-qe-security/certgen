@@ -976,6 +976,78 @@ _ncGet () { # helper function for extracting nameConstraints from certificates
         rlRun "x509RmAlias server"
     rlPhaseEnd
 
+    # run only on RHEL-10 and later in normal mode
+    if ! rlIsRHEL '<10' && [[ $fips -eq 0 ]]; then
+        rlPhaseStartTest "Enable oqsprovider by default"
+            if [[ -e /etc/pki/tls/openssl.d/oqsprovider.cnf ]]; then
+                rlLogInfo "oqsprovider config file exists"
+                _OQS_REMOVE="false"
+            else
+                rlRun "cat > /etc/pki/tls/openssl.d/oqsprovider.cnf <<EOF
+[provider_sect]
+oqsprovider = oqsprovider_sect
+
+[oqsprovider_sect]
+activate = 1
+EOF"
+                _OQS_REMOVE="true"
+            fi
+        rlPhaseEnd
+
+        rlPhaseStartTest "General PQC support"
+            rlRun "x509KeyGen -t mldsa65 ca"
+            rlRun "x509KeyGen -t mldsa65 server"
+            rlRun "x509SelfSign ca"
+            rlRun "x509CertSign --CA ca server"
+            rlRun -s "x509DumpCert ca"
+            rlAssertGrep "Public Key Algorithm: mldsa65" $rlRun_LOG
+            rlRun -s "x509DumpCert server"
+            rlAssertGrep "Signature Algorithm: mldsa65" $rlRun_LOG
+            rlRun "x509KeyGen -t mldsa65 server-2"
+            rlRun "x509CertSign --CA ca --DN 'CN=localhost2' server-2"
+            rlRun "x509Revoke --CA ca --crlReason keyCompromise server-2"
+            rlRun "x509GenerateCRL ca"
+            rlAssertExists "ca/$x509CRL"
+            rlRun -s "openssl crl -in ca/$x509CRL -text"
+            rlAssertGrep "Signature.*mldsa65" $rlRun_LOG -E
+            rlRun "grep -A1 'Revoked Certificates' $rlRun_LOG | grep 'Serial Number: 03'"
+            rlRun "rm $rlRun_LOG"
+            rlRun "x509RmAlias ca"
+            rlRun "x509RmAlias server"
+            rlRun "x509RmAlias server-2"
+        rlPhaseEnd
+
+        # NOTE: SPHINCS will need to be removed later, it should be
+        # SLH-DSA instead
+        algorithms=('mldsa44' 'mldsa65' 'mldsa87' 'p256_mldsa44' 'p384_mldsa65'
+            'p521_mldsa87' 'mldsa44_p256' 'mldsa65_p256' 'mldsa87_p384'
+            'mldsa44_ed25519' 'mldsa65_ed25519' 'mldsa87_ed448'
+            'mldsa44_rsa2048' 'mldsa65_rsa3072'
+            'sphincssha2128fsimple' 'sphincssha2128ssimple'
+            'sphincssha2192fsimple' 'sphincsshake128fsimple'
+            )
+        for alg in "${algorithms[@]}"; do
+            rlPhaseStartTest "Test $alg support"
+                rlRun "x509KeyGen -t $alg ca"
+                rlRun "x509KeyGen -t $alg server"
+                rlRun "x509SelfSign ca"
+                rlRun "x509CertSign --CA ca server"
+                rlAssertExists "$(x509Cert server)"
+                rlRun "x509DumpCert server"
+                rlRun "x509RmAlias ca"
+                rlRun "x509RmAlias server"
+            rlPhaseEnd
+        done
+
+        rlPhaseStartTest "Restore default oqsprovider settings"
+            if [[ $_OQS_REMOVE == "true" ]]; then
+                rlRun "rm -rf /etc/pki/tls/openssl.d/oqsprovider.cnf"
+            else
+                rlLogInfo "Not removing existing file"
+            fi
+        rlPhaseEnd
+    fi
+
     rlPhaseStartCleanup
         rlRun "popd"
         rlRun "rm -r $TmpDir" 0 "Removing tmp directory"
