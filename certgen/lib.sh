@@ -407,6 +407,7 @@ distinguished_name = cert_req
 [ cert_req ]
 EOF
 
+    local item
     for item in "${dn[@]}"; do
         echo "$item" >> "$kAlias/$x509CACNF"
     done
@@ -458,6 +459,7 @@ EOF
     if [[ ${#authorityInfoAccess[@]} -ne 0 ]]; then
         local aia_val=""
         local separator=""
+        local aia
         for aia in "${authorityInfoAccess[@]}"; do
             aia_val="${aia_val}${separator}${aia}"
             separator=","
@@ -476,6 +478,7 @@ EOF
         echo "" >> "$kAlias/$x509CACNF"
         echo "[ alt_name ]" >> "$kAlias/$x509CACNF"
 
+        local name
         for name in "${subjectAltName[@]}"; do
             echo "$name" >> "$kAlias/$x509CACNF"
         done
@@ -505,6 +508,7 @@ __INTERNAL_x509NamesToNCs() {
     local keyword=$2
     local -a constraints
     local result=""
+    local name
     for name in "${names[@]}"; do
         local constraint=$(__INTERNAL_x509NameToConstraint "$name")
         constraints=("${constraints[@]}" "$keyword;$constraint")
@@ -1323,6 +1327,7 @@ x509SelfSign() {
     #
 
     declare -a parameters
+    local option
     for option in "${certDN[@]}"; do
         parameters=("${parameters[@]}" "--dn=$option")
     done
@@ -2193,6 +2198,7 @@ x509CertSign() {
     #
 
     declare -a parameters
+    local option
     for option in "${certDN[@]}"; do
         parameters=("${parameters[@]}" "--dn=$option")
     done
@@ -2231,6 +2237,7 @@ x509CertSign() {
         parameters=("${parameters[@]}" "--crlDistributionPoints=${crlDistributionPoints}")
     fi
 
+    local name
     for name in "${subjectAltName[@]}"; do
         parameters=("${parameters[@]}" "--subjectAltName=$name")
     done
