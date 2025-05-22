@@ -406,7 +406,7 @@ rlJournalStart
             rlAssertGrep "PSS parameter restrictions" $rlRun_LOG
             if ${x509OPENSSL} version | grep -Eq '1[.]1[.]1'; then
                 rlAssertGrep "Hash Algorithm: sha256" $rlRun_LOG
-                rlAssertGrep "Minimum Salt Length: 0x14" $rlRun_LOG
+                rlAssertGrep "Minimum Salt Length: 0x20" $rlRun_LOG
             else
                 # new OpenSSL calls the algorithm differently
                 rlAssertGrep "Hash Algorithm: SHA2-256" $rlRun_LOG
@@ -420,7 +420,7 @@ rlJournalStart
             rlRun "grep -A3 'PSS parameter restrictions' $rlRun_LOG > restrictions.txt"
             if ${x509OPENSSL} version | grep -Eq '1[.]1[.]1'; then
                 rlAssertGrep "Hash Algorithm: sha256" restrictions.txt
-                rlAssertGrep "Minimum Salt Length: 0x14" restrictions.txt
+                rlAssertGrep "Minimum Salt Length: 0x20" restrictions.txt
             else
                 # new OpenSSL calls the algorithm differently
                 rlAssertGrep "Hash Algorithm: SHA2-256" restrictions.txt
