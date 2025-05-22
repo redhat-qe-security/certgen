@@ -695,7 +695,7 @@ x509KeyGen() {
         && [[ $kType != "ECDSA" ]] && [[ $kType != "RSA-PSS" ]] \
         && [[ $kType != "ED25519" ]] && [[ $kType != "ED448" ]] \
         && ! [[ $kType =~ MLDSA ]] && ! [[ $kType =~ SLHDSA ]] \
-        && ! [[ $kType =~ SPHINCS ]] ; then
+        && ! [[ $kType =~ SLH-DSA ]] && ! [[ $kType =~ SPHINCS ]] ; then
 
         echo "x509KeyGen: Unknown key type: $kType" >&2
         return 1

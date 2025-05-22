@@ -395,7 +395,7 @@ rlJournalStart
             rlAssertGrep "2048 bit" $rlRun_LOG
             rlRun "x509RmAlias ca"
             # check if the command line options work
-            rlRun "x509KeyGen -t rsa-pss -s 3072 --gen-opts rsa_pss_keygen_md:sha256 --gen-opts rsa_pss_keygen_saltlen:20 ca"
+            rlRun "x509KeyGen -t rsa-pss -s 3072 --gen-opts rsa_pss_keygen_md:sha256 --gen-opts rsa_pss_keygen_saltlen:32 --gen-opts rsa_pss_keygen_mgf1_md:sha256 ca"
             rlRun -s "${x509OPENSSL} pkey -noout -text -in $(x509Key ca)"
             if ${x509OPENSSL} version | grep -Eq '1[.]1[.]1'; then
                 # OpenSSL 3.0.0 doesn't print the type any more
@@ -411,7 +411,8 @@ rlJournalStart
                 # new OpenSSL calls the algorithm differently
                 rlAssertGrep "Hash Algorithm: SHA2-256" $rlRun_LOG
                 # and doesn't use hex encoding for the length
-                rlAssertGrep "Minimum Salt Length: 20" $rlRun_LOG
+                rlAssertGrep "Minimum Salt Length: 32" $rlRun_LOG
+                rlAssertGrep "Mask Algorithm: MGF1 with SHA2-256" $rlRun_LOG
             fi
             rlRun "x509SelfSign ca"
             rlRun -s "x509DumpCert ca"
@@ -424,7 +425,8 @@ rlJournalStart
                 # new OpenSSL calls the algorithm differently
                 rlAssertGrep "Hash Algorithm: SHA2-256" restrictions.txt
                 # and doesn't use hex encoding for the length
-                rlAssertGrep "Minimum Salt Length: 20" restrictions.txt
+                rlAssertGrep "Minimum Salt Length: 32" restrictions.txt
+                rlAssertGrep "Mask Algorithm: MGF1 with SHA2-256" $rlRun_LOG
             fi
             rlRun "rm $rlRun_LOG restrictions.txt"
             # check if rsa-pss certificate automatically creates rsa-pss
@@ -1000,16 +1002,16 @@ EOF"
             rlRun "x509SelfSign ca"
             rlRun "x509CertSign --CA ca server"
             rlRun -s "x509DumpCert ca"
-            rlAssertGrep "Public Key Algorithm: mldsa65" $rlRun_LOG
+            rlAssertGrep "Public Key Algorithm: (mldsa65|ML-DSA-65)" $rlRun_LOG -E
             rlRun -s "x509DumpCert server"
-            rlAssertGrep "Signature Algorithm: mldsa65" $rlRun_LOG
+            rlAssertGrep "Signature Algorithm: (mldsa65|ML-DSA-65)" $rlRun_LOG -E
             rlRun "x509KeyGen -t mldsa65 server-2"
             rlRun "x509CertSign --CA ca --DN 'CN=localhost2' server-2"
             rlRun "x509Revoke --CA ca --crlReason keyCompromise server-2"
             rlRun "x509GenerateCRL ca"
             rlAssertExists "ca/$x509CRL"
             rlRun -s "openssl crl -in ca/$x509CRL -text"
-            rlAssertGrep "Signature.*mldsa65" $rlRun_LOG -E
+            rlAssertGrep "Signature.*(mldsa65|ML-DSA-65)" $rlRun_LOG -E
             rlRun "grep -A1 'Revoked Certificates' $rlRun_LOG | grep 'Serial Number: 03'"
             rlRun "rm $rlRun_LOG"
             rlRun "x509RmAlias ca"
@@ -1019,13 +1021,25 @@ EOF"
 
         # NOTE: SPHINCS will need to be removed later, it should be
         # SLH-DSA instead
-        algorithms=('mldsa44' 'mldsa65' 'mldsa87' 'p256_mldsa44' 'p384_mldsa65'
-            'p521_mldsa87' 'mldsa44_p256' 'mldsa65_p256' 'mldsa87_p384'
-            'mldsa44_ed25519' 'mldsa65_ed25519' 'mldsa87_ed448'
-            'mldsa44_rsa2048' 'mldsa65_rsa3072'
-            'sphincssha2128fsimple' 'sphincssha2128ssimple'
-            'sphincssha2192fsimple' 'sphincsshake128fsimple'
-            )
+        # hybrid signatures aren't supported in native OpenSSL 3.5
+        if rlIsRHEL '<10.1'; then
+            algorithms=('mldsa44' 'mldsa65' 'mldsa87' 'p256_mldsa44' 'p384_mldsa65'
+                'p521_mldsa87' 'mldsa44_p256' 'mldsa65_p256' 'mldsa87_p384'
+                'mldsa44_ed25519' 'mldsa65_ed25519' 'mldsa87_ed448'
+                'mldsa44_rsa2048' 'mldsa65_rsa3072'
+                'sphincssha2128fsimple' 'sphincssha2128ssimple'
+                'sphincssha2192fsimple' 'sphincsshake128fsimple'
+                )
+        else
+            algorithms=('mldsa44' 'mldsa65' 'mldsa87'
+                'SLH-DSA-SHA2-128s' 'SLH-DSA-SHA2-128f'
+                'SLH-DSA-SHA2-192s' 'SLH-DSA-SHA2-192f'
+                'SLH-DSA-SHA2-256s' 'SLH-DSA-SHA2-256f'
+                'SLH-DSA-SHAKE-128s' 'SLH-DSA-SHAKE-128f'
+                'SLH-DSA-SHAKE-192s' 'SLH-DSA-SHAKE-192f'
+                'SLH-DSA-SHAKE-256s' 'SLH-DSA-SHAKE-256f'
+                )
+        fi
         for alg in "${algorithms[@]}"; do
             rlPhaseStartTest "Test $alg support"
                 rlRun "x509KeyGen -t $alg ca"
