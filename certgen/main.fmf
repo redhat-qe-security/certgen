@@ -1,6 +1,6 @@
 summary: Library for creating X.509 certificates for any use
 description: ''
-contact: Hubert Kario <hkario@redhat.com>
+contact: Alicja Kario <hkario@redhat.com>
 component:
   - openssl
 test: ./runtest.sh
