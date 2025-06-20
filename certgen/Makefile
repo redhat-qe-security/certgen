@@ -2,7 +2,7 @@
 #
 #   Makefile of /CoreOS/openssl/Library/certgen
 #   Description: Library for creating X.509 certificates for any use
-#   Author: Hubert Kario <hkario@redhat.com>
+#   Author: Alicja Kario <hkario@redhat.com>
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
@@ -46,7 +46,7 @@ clean:
 include /usr/share/rhts/lib/rhts-make.include
 
 $(METADATA): Makefile
-	@echo "Owner:           Hubert Kario <hkario@redhat.com>" > $(METADATA)
+	@echo "Owner:           Alicja Kario <hkario@redhat.com>" > $(METADATA)
 	@echo "Name:            $(TEST)" >> $(METADATA)
 	@echo "TestVersion:     $(TESTVERSION)" >> $(METADATA)
 	@echo "Path:            $(TEST_DIR)" >> $(METADATA)

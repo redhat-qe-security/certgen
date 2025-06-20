@@ -4,7 +4,7 @@
 #
 #   runtest.sh of /CoreOS/openssl/Library/certgen
 #   Description: Library for creating X.509 certificates for any use
-#   Author: Hubert Kario <hkario@redhat.com>
+#   Author: Alicja Kario <hkario@redhat.com>
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #

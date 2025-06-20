@@ -4,7 +4,7 @@
 #
 #   lib.sh of /CoreOS/openssl/Library/certgen
 #   Description: Library for creating X.509 certificates for any use
-#   Author: Hubert Kario <hkario@redhat.com>
+#   Author: Alicja Kario <hkario@redhat.com>
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
@@ -3186,7 +3186,7 @@ for deciphering data when performing key agreement.
 
 =item *
 
-Hubert Kario <hkario@redhat.com>
+Alicja Kario <hkario@redhat.com>
 
 =back
 
